@@ -1,7 +1,7 @@
 package state
 
 data class ModbusUiState(
-    val ports: List<String> = emptyList(),
+    val ports: Map<String, String> = emptyMap(),
     val selectedPort: String = "",
     val baudRate: String = "38400",
     val dataBits: String = "8",
@@ -13,6 +13,7 @@ data class ModbusUiState(
     val rawRequest: String = "",
     val response: String = "",
     val lastRequestHex: String = "",
+    val showAllPorts: Boolean = false,
     val error: String? = null,
     val displayMode: DisplayMode = DisplayMode.HEX
 )

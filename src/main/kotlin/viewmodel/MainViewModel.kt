@@ -16,10 +16,16 @@ class MainViewModel {
     private val modbus = Modbus()
 
     fun loadPorts() {
-        val portNames = SerialPort.getCommPorts().map { it.systemPortName }
+        val portsMap = SerialPort.getCommPorts()
+            .filter {
+                state.showAllPorts || it.descriptivePortName.contains("CP21", ignoreCase = true)
+            }
+            .associate { port ->
+                port.systemPortName to "${port.systemPortName} (${port.descriptivePortName})"
+            }
         state = state.copy(
-            ports = portNames,
-            selectedPort = portNames.firstOrNull() ?: ""
+            ports = portsMap,
+            selectedPort = portsMap.keys.firstOrNull() ?: ""
         )
     }
 

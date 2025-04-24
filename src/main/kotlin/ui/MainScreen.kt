@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.selects.select
 import state.DisplayMode
 import ui.components.DropdownMenuField
 import viewmodel.MainViewModel
@@ -35,8 +36,27 @@ fun MainScreen() {
         ) {
             Text("TRM1 Terminal", style = MaterialTheme.typography.h5)
 
-            DropdownMenuField("COM Port", state.selectedPort, state.ports) {
-                viewModel.update { copy(selectedPort = it) }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                Checkbox(
+                    checked = state.showAllPorts,
+                    onCheckedChange = {
+                        viewModel.update { copy(showAllPorts = it) }
+                        viewModel.loadPorts()
+                    }
+                )
+                Text("Show all COM ports", modifier = Modifier.padding(start = 8.dp))
+            }
+
+            DropdownMenuField(
+                label = "COM Port",
+                selected = state.selectedPort,
+                options = state.ports.values.toList()  // отображаемые названия
+            ) { selectedText ->
+                val selectedKey = state.ports.entries.find { it.value == selectedText }?.key ?: ""
+                viewModel.update { copy(selectedPort = selectedKey) }
             }
 
             OutlinedTextField(
