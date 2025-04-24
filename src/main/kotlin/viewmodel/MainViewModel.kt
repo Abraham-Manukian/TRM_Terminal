@@ -61,7 +61,7 @@ class MainViewModel {
                 else -> 0x03
             }
 
-            val slave = 1
+            val slave = state.slaveAddress.toIntOrNull()?.takeIf { it in 1..247 } ?: 1
             val address = state.address.toIntOrNull() ?: 0
             val quantity = state.quantity.toIntOrNull() ?: 1
 

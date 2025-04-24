@@ -8,6 +8,7 @@ data class ModbusUiState(
     val stopBits: String = "1",
     val requestType: String = "Read Holding Registers",
     val address: String = "4102",
+    val slaveAddress: String = "1",
     val quantity: String = "2",
     val rawRequest: String = "",
     val response: String = "",

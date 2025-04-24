@@ -18,6 +18,9 @@ fun MainScreen() {
     val viewModel = remember { MainViewModel() }
     val state = viewModel.state
 
+    val slaveInt = state.slaveAddress.toIntOrNull()
+    val isSlaveValid = slaveInt != null && slaveInt in 1..247
+
     LaunchedEffect(Unit) {
         viewModel.loadPorts()
     }
@@ -35,6 +38,29 @@ fun MainScreen() {
             DropdownMenuField("COM Port", state.selectedPort, state.ports) {
                 viewModel.update { copy(selectedPort = it) }
             }
+
+            OutlinedTextField(
+                value = state.slaveAddress,
+                onValueChange = {
+                    if (it.all { ch -> ch.isDigit() } && (it.toIntOrNull() ?: 0) <= 999) {
+                        viewModel.update { copy(slaveAddress = it) }
+                    }
+                },
+                label = { Text("Slave Address (1–247)") },
+                isError = !isSlaveValid,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            if (!isSlaveValid) {
+                Text(
+                    text = "Введите число от 1 до 247",
+                    color = MaterialTheme.colors.error,
+                    style = MaterialTheme.typography.caption
+                )
+            }
+
+
             DropdownMenuField("Baud Rate", state.baudRate, listOf("9600", "19200", "38400")) {
                 viewModel.update { copy(baudRate = it) }
             }
