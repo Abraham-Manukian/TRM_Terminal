@@ -12,7 +12,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import state.ByteOrder
 import state.DisplayMode
+import ui.components.DropdownMenuField
 import viewmodel.MainViewModel
 
 @Composable
@@ -64,6 +66,16 @@ fun RequestScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                 }
             }
         }
+
+        DropdownMenuField(
+            label = "Формат",
+            selected = state.byteOrder.label,
+            options = ByteOrder.values().map { it.label }
+        ) { label ->
+            val order = ByteOrder.values().find { it.label == label } ?: ByteOrder.ABCD
+            viewModel.update { copy(byteOrder = order) }
+        }
+
 
         Button(onClick = { viewModel.sendGeneratedRequest() }, modifier = Modifier.fillMaxWidth()) {
             Text("Отправить команду")

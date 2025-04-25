@@ -6,11 +6,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.fazecast.jSerialComm.SerialPort
 import model.Modbus
+import state.ByteOrder
 import state.ModbusUiState
 import state.DisplayMode
 import ui.components.NotificationManager
 import java.nio.ByteBuffer
-import java.nio.ByteOrder
+
 
 class MainViewModel {
 
@@ -115,6 +116,7 @@ class MainViewModel {
 
         return when (state.displayMode) {
             DisplayMode.HEX -> state.response
+
             DisplayMode.DEC -> {
                 val data = bytes.drop(3).dropLast(2)
                 data.chunked(2).mapIndexed { index, pair ->
@@ -123,15 +125,26 @@ class MainViewModel {
                     "Регистр $index = $value"
                 }.joinToString("\n")
             }
+
             DisplayMode.FLOAT -> {
                 val data = bytes.drop(3).dropLast(2)
+
                 data.chunked(4).mapIndexed { index, group ->
                     if (group.size == 4) {
-                        val byteArray = byteArrayOf(group[0], group[1], group[2], group[3]) //ABCD TODO
-                        val bb = ByteBuffer.allocate(4) // не надо
-                        bb.order(ByteOrder.BIG_ENDIAN) // не надо
-                        val float = java.nio.ByteBuffer.wrap(byteArray).float
-                        "Float $index = $float"
+
+                        val byteArray = when (state.byteOrder) {
+                            ByteOrder.ABCD -> byteArrayOf(group[0], group[1], group[2], group[3])
+                            ByteOrder.CDAB -> byteArrayOf(group[2], group[3], group[0], group[1])
+                            ByteOrder.BADC -> byteArrayOf(group[1], group[0], group[3], group[2])
+                            ByteOrder.DCBA -> byteArrayOf(group[3], group[2], group[1], group[0])
+                        }
+
+                        try {
+                            val float = java.nio.ByteBuffer.wrap(byteArray).float
+                            "Float $index = %.5f".format(float)
+                        } catch (e: Exception) {
+                            "Float $index = Ошибка декодирования"
+                        }
                     } else {
                         "Float $index = ???"
                     }

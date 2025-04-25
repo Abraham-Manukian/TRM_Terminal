@@ -15,5 +15,6 @@ data class ModbusUiState(
     val lastRequestHex: String = "",
     val showAllPorts: Boolean = false,
     val error: String? = null,
-    val displayMode: DisplayMode = DisplayMode.HEX
+    val displayMode: DisplayMode = DisplayMode.HEX,
+    val byteOrder: ByteOrder = ByteOrder.ABCD
 )
