@@ -9,10 +9,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ui.components.DropdownMenuField
+import ui.components.NotificationManager
+import ui.components.NotificationPopup
 import viewmodel.MainViewModel
 
 @Composable
@@ -29,6 +32,8 @@ fun ConnectionScreen(viewModel: MainViewModel, onBack: () -> Unit) {
         placeholderColor = colors.onSurface.copy(alpha = 0.3f)
     )
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
     LaunchedEffect(state.showAllPorts){
         viewModel.loadPorts()
     }
@@ -42,7 +47,12 @@ fun ConnectionScreen(viewModel: MainViewModel, onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
+            IconButton(onClick = {
+                val valid = state.slaveAddress.toIntOrNull() in 1..247
+                if (valid) onBack()
+                else NotificationManager.show("Сначала введите корректный адрес")
+            }
+            ) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Назад", tint = colors.onBackground)
             }
             Text("Настройки подключения", style = MaterialTheme.typography.h6, color = colors.onBackground)
@@ -103,5 +113,16 @@ fun ConnectionScreen(viewModel: MainViewModel, onBack: () -> Unit) {
         if (state.slaveAddress.toIntOrNull() !in 1..247) {
             Text("Введите число от 1 до 247", color = colors.error, style = MaterialTheme.typography.caption)
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = { viewModel.saveConnectionSettings() },
+            modifier = Modifier.fillMaxWidth()
+            )
+        {
+            Text("Сохранить")
+        }
     }
+    NotificationPopup()
 }

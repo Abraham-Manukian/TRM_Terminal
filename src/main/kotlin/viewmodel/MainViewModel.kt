@@ -1,5 +1,6 @@
 package viewmodel
 
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -7,6 +8,9 @@ import com.fazecast.jSerialComm.SerialPort
 import model.Modbus
 import state.ModbusUiState
 import state.DisplayMode
+import ui.components.NotificationManager
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 class MainViewModel {
 
@@ -32,6 +36,17 @@ class MainViewModel {
     fun update(modifier: ModbusUiState.() -> ModbusUiState) {
         state = state.modifier()
     }
+
+
+    fun saveConnectionSettings() {
+        val address = state.slaveAddress.toIntOrNull()
+        if (address in 1..247) {
+            NotificationManager.show("Настройки сохранены")
+        } else {
+            NotificationManager.show("Ошибка: Неверный адрес")
+        }
+    }
+
 
     fun sendRawRequest() {
         try {
@@ -112,7 +127,9 @@ class MainViewModel {
                 val data = bytes.drop(3).dropLast(2)
                 data.chunked(4).mapIndexed { index, group ->
                     if (group.size == 4) {
-                        val byteArray = byteArrayOf(group[0], group[1], group[2], group[3])
+                        val byteArray = byteArrayOf(group[0], group[1], group[2], group[3]) //ABCD TODO
+                        val bb = ByteBuffer.allocate(4) // не надо
+                        bb.order(ByteOrder.BIG_ENDIAN) // не надо
                         val float = java.nio.ByteBuffer.wrap(byteArray).float
                         "Float $index = $float"
                     } else {
