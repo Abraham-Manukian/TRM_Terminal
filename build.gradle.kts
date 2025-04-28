@@ -28,6 +28,11 @@ dependencies {
     //Иконки
     implementation("org.jetbrains.compose.material:material-icons-extended-desktop:1.5.12")
 
+    //Переходы экарнов
+    implementation("cafe.adriel.voyager:voyager-navigator:1.0.1")
+    implementation("cafe.adriel.voyager:voyager-core:1.0.1")
+
+
 
 
 

@@ -10,42 +10,51 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.example.AppScreen
+import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.navigator.LocalNavigator
+import viewmodel.MainViewModel
 
-@Composable
-fun MainMenuScreen(
-    onNavigate: (AppScreen) -> Unit,
-    isDark: Boolean,
-    onToggleTheme: () -> Unit
-) {
-    Box(
-        modifier = Modifier
+class MainMenuScreen (
+    private val viewModel: MainViewModel,
+    private val isDarkTheme: MutableState<Boolean>
+) : Screen {
+
+    @Composable
+    override fun Content() {
+        val navigator = LocalNavigator.current
+
+
+        Box(modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colors.background)
-    ) {
-        Column(
-            modifier = Modifier.align(Alignment.Center),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("TRM1 Terminal", style = MaterialTheme.typography.h4, color = MaterialTheme.colors.onBackground)
-            Button(onClick = { onNavigate(AppScreen.Connection) }) {
-                Text("Настройки подключения")
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("TRM1 Terminal", style = MaterialTheme.typography.h5, color = MaterialTheme.colors.onBackground)
+                Button(onClick = {
+                    navigator?.push(ConnectionScreen(viewModel))
+                }) {
+                    Text("Настройки подключения")
+                }
+                Button(onClick = {
+                    navigator?.push(RequestScreen(viewModel))
+                }) {
+                    Text("Опрос данных")
+                }
             }
-            Button(onClick = { onNavigate(AppScreen.Request) }) {
-                Text("Окно запроса")
-            }
-        }
 
-        IconButton(
-            onClick = onToggleTheme,
-            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
-        ) {
-            Icon(
-                imageVector = if (isDark) Icons.Default.Brightness7 else Icons.Default.Brightness4,
-                contentDescription = "Toggle theme",
-                tint = MaterialTheme.colors.onBackground
-            )
+            IconButton(
+                onClick = { isDarkTheme.value = !isDarkTheme.value },
+                modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = if (isDarkTheme.value) Icons.Default.Brightness7 else Icons.Default.Brightness4,
+                    contentDescription = "Toggle theme"
+                )
+            }
         }
     }
 }

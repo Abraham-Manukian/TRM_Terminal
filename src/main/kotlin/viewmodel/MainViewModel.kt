@@ -10,7 +10,6 @@ import state.ByteOrder
 import state.ModbusUiState
 import state.DisplayMode
 import ui.components.NotificationManager
-import java.nio.ByteBuffer
 
 
 class MainViewModel {
