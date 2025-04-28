@@ -1,10 +1,26 @@
-package ui
+package ui.screen
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.*
+import androidx.compose.material.Button
+import androidx.compose.material.Checkbox
+import androidx.compose.material.CheckboxDefaults
+import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.OutlinedTextField
+import androidx.compose.material.SnackbarHostState
+import androidx.compose.material.Text
+import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.Composable
@@ -18,10 +34,11 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import ui.components.DropdownMenuField
 import ui.components.NotificationManager
 import ui.components.NotificationPopup
-import viewmodel.MainViewModel
+import ui.viewmodel.ConnectionViewModel
+import state.ConnectionState
 
 class ConnectionScreen(
-    private val viewModel: MainViewModel
+    private val viewModel: ConnectionViewModel
 ) : Screen {
 
     @Composable
@@ -55,8 +72,7 @@ class ConnectionScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = {
-                    val valid = state.slaveAddress.toIntOrNull() in 1..247
-                    if (valid) {
+                    if (state.slaveAddress.toIntOrNull() in 1..247) {
                         navigator?.pop()
                     } else {
                         NotificationManager.show("Сначала введите корректный адрес")
@@ -69,11 +85,11 @@ class ConnectionScreen(
 
             DropdownMenuField(
                 label = "COM Port",
-                selected = state.ports[state.selectedPort] ?: "",
-                options = state.ports.values.toList()
+                selected = state.ports[state.selectedPort]?.displayName ?: "",
+                options = state.ports.values.map { it.displayName }
             ) { selectedText ->
-                val selectedKey = state.ports.entries.find { it.value == selectedText }?.key ?: ""
-                viewModel.update { copy(selectedPort = selectedKey) }
+                val selectedKey = state.ports.entries.find { it.value.displayName == selectedText }?.key ?: ""
+                viewModel.updateState(state.copy(selectedPort = selectedKey))
             }
 
             Row(
@@ -83,8 +99,7 @@ class ConnectionScreen(
                 Checkbox(
                     checked = state.showAllPorts,
                     onCheckedChange = {
-                        viewModel.update { copy(showAllPorts = it) }
-                        viewModel.loadPorts()
+                        viewModel.toggleShowAllPorts()
                     },
                     colors = CheckboxDefaults.colors(
                         checkedColor = colors.primary,
@@ -95,22 +110,22 @@ class ConnectionScreen(
             }
 
             DropdownMenuField("Baud Rate", state.baudRate, listOf("9600", "19200", "38400")) {
-                viewModel.update { copy(baudRate = it) }
+                viewModel.updateState(state.copy(baudRate = it))
             }
 
             DropdownMenuField("Data Bits", state.dataBits, listOf("7", "8")) {
-                viewModel.update { copy(dataBits = it) }
+                viewModel.updateState(state.copy(dataBits = it))
             }
 
             DropdownMenuField("Stop Bits", state.stopBits, listOf("1", "2")) {
-                viewModel.update { copy(stopBits = it) }
+                viewModel.updateState(state.copy(stopBits = it))
             }
 
             OutlinedTextField(
                 value = state.slaveAddress,
                 onValueChange = {
                     if (it.all { c -> c.isDigit() } && (it.toIntOrNull() ?: 0) <= 999)
-                        viewModel.update { copy(slaveAddress = it) }
+                        viewModel.updateState(state.copy(slaveAddress = it))
                 },
                 label = { Text("Slave Address (1–247)") },
                 singleLine = true,
@@ -130,6 +145,21 @@ class ConnectionScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Сохранить")
+            }
+            
+            Button(
+                onClick = { viewModel.sendTestRequest() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Проверить соединение")
+            }
+            
+            state.testResponse?.let {
+                Text(it, color = colors.primary, style = MaterialTheme.typography.body2)
+            }
+            
+            state.error?.let {
+                Text(it, color = colors.error, style = MaterialTheme.typography.body2)
             }
         }
 

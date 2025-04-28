@@ -1,23 +1,24 @@
 package org.example
 
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import cafe.adriel.voyager.navigator.Navigator
+import di.appModule
+import org.koin.compose.KoinApplication
+import org.koin.compose.koinInject
 import theme.AppTheme
-import ui.ConnectionScreen
-import ui.MainMenuScreen
-import ui.RequestScreen
-import viewmodel.MainViewModel
+import ui.screen.MainMenuScreen
+import ui.viewmodel.MainMenuViewModel
 
 fun main() = application {
-    val viewModel = remember { MainViewModel() }
-    val isDarkTheme = remember { mutableStateOf(false) }
-
-    AppTheme(isDark = isDarkTheme.value) {
-        Window(onCloseRequest = ::exitApplication, title = "TRM1 Terminal") {
-            Navigator(screen = MainMenuScreen(viewModel, isDarkTheme))
+    KoinApplication(application = {
+        modules(appModule)
+    }) {
+        val viewModel = koinInject<MainMenuViewModel>()
+        AppTheme(isDark = viewModel.themeState.isDarkTheme) {
+            Window(onCloseRequest = ::exitApplication, title = "TRM1 Terminal") {
+                Navigator(screen = MainMenuScreen(viewModel))
+            }
         }
     }
 }

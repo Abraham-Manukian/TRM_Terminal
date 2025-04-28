@@ -5,11 +5,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.fazecast.jSerialComm.SerialPort
-import model.Modbus
+import data.Modbus
 import state.ByteOrder
 import state.ModbusUiState
 import state.DisplayMode
 import ui.components.NotificationManager
+import java.nio.ByteBuffer
 
 
 class MainViewModel {
@@ -139,7 +140,7 @@ class MainViewModel {
                         }
 
                         try {
-                            val float = java.nio.ByteBuffer.wrap(byteArray).float
+                            val float = ByteBuffer.wrap(byteArray).float
                             "Float $index = %.5f".format(float)
                         } catch (e: Exception) {
                             "Float $index = Ошибка декодирования"

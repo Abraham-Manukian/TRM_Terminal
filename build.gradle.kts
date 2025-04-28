@@ -32,6 +32,12 @@ dependencies {
     implementation("cafe.adriel.voyager:voyager-navigator:1.0.1")
     implementation("cafe.adriel.voyager:voyager-core:1.0.1")
 
+    // Koin Core
+    implementation("io.insert-koin:koin-core:4.0.4")
+
+    // Koin для Compose Desktop
+    implementation("io.insert-koin:koin-compose:4.0.4")
+
 
 
 

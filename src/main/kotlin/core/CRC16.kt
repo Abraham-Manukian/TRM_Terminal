@@ -1,4 +1,4 @@
-package model
+package core
 
 
 class CRC16Modbus {

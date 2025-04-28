@@ -1,11 +1,25 @@
-package ui
+package ui.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.*
+import androidx.compose.material.Button
+import androidx.compose.material.Divider
+import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.OutlinedTextField
+import androidx.compose.material.RadioButton
+import androidx.compose.material.Text
+import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.Composable
@@ -14,13 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
-import state.ByteOrder
-import state.DisplayMode
 import ui.components.DropdownMenuField
-import viewmodel.MainViewModel
+import ui.viewmodel.RequestViewModel
+import state.DisplayMode
+import state.ByteOrder
+
 
 class RequestScreen(
-    private val viewModel: MainViewModel
+    private val viewModel: RequestViewModel
 ) : Screen {
 
     @Composable
@@ -65,7 +80,7 @@ class RequestScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.clickable {
-                            viewModel.update { copy(displayMode = mode) }
+                            viewModel.updateState(state.copy(displayMode = mode))
                         }
                     ) {
                         RadioButton(selected = selected, onClick = null)
@@ -84,7 +99,7 @@ class RequestScreen(
                 options = ByteOrder.values().map { it.label }
             ) { label ->
                 val order = ByteOrder.values().find { it.label == label } ?: ByteOrder.ABCD
-                viewModel.update { copy(byteOrder = order) }
+                viewModel.updateState(state.copy(byteOrder = order))
             }
 
             Button(onClick = { viewModel.sendGeneratedRequest() }, modifier = Modifier.fillMaxWidth()) {
@@ -97,7 +112,7 @@ class RequestScreen(
 
             OutlinedTextField(
                 value = state.rawRequest,
-                onValueChange = { viewModel.update { copy(rawRequest = it) } },
+                onValueChange = { viewModel.updateState(state.copy(rawRequest = it)) },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Hex-запрос") },
                 colors = tfColors
@@ -128,6 +143,10 @@ class RequestScreen(
                 label = { Text("Ответ (${state.displayMode.name})") },
                 colors = tfColors
             )
+            
+            state.error?.let {
+                Text(it, color = colors.error, style = MaterialTheme.typography.body2)
+            }
         }
     }
 }
