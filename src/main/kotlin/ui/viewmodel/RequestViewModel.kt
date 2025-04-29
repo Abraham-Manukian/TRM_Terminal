@@ -2,7 +2,6 @@ package ui.viewmodel
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import domain.usecase.FormatResponseUseCase
 import domain.usecase.GenerateRequestUseCase
 import domain.usecase.LoadPortsUseCase
@@ -10,17 +9,23 @@ import domain.usecase.SendRequestUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.koin.core.component.KoinComponent
 import state.RequestState
+import ui.components.NotificationManager
 
+/**
+ * ViewModel для экрана отправки запросов
+ */
 class RequestViewModel(
     private val sendRequestUseCase: SendRequestUseCase,
     private val generateRequestUseCase: GenerateRequestUseCase,
     private val formatResponseUseCase: FormatResponseUseCase,
     private val loadPortsUseCase: LoadPortsUseCase
-) {
-    var state by mutableStateOf(RequestState())
-        private set
-        
+) : KoinComponent {
+    // Состояние представления с использованием mutableStateOf для реактивности
+    private val _state = mutableStateOf(RequestState())
+    val state: RequestState by _state
+    
     private val scope = CoroutineScope(Dispatchers.IO)
     
     init {
@@ -29,47 +34,27 @@ class RequestViewModel(
     
     fun loadPorts() {
         val ports = loadPortsUseCase.execute(state.showAllPorts)
-        state = state.copy(
+        updateState(state.copy(
             ports = ports.associateBy { it.systemName },
             selectedPort = ports.firstOrNull()?.systemName ?: ""
-        )
+        ))
     }
     
     fun toggleShowAllPorts() {
-        state = state.copy(showAllPorts = !state.showAllPorts)
+        updateState(state.copy(showAllPorts = !state.showAllPorts))
         loadPorts()
     }
     
+    /**
+     * Обновление состояния
+     */
     fun updateState(newState: RequestState) {
-        state = newState
+        _state.value = newState
     }
     
-    fun sendRawRequest() {
-        scope.launch {
-            try {
-                val bytes = state.rawRequest.split(" ")
-                    .filter { it.isNotBlank() }
-                    .map { it.toInt(16).toByte() }
-                    .toByteArray()
-
-                val response = sendRequestUseCase.sendRequest(
-                    portName = state.selectedPort,
-                    baudRate = state.baudRate.toInt(),
-                    dataBits = state.dataBits.toInt(),
-                    stopBits = state.stopBits.toInt(),
-                    request = bytes
-                )
-
-                val hexRequest = bytes.joinToString(" ") { "%02X".format(it) }
-                val hex = response.joinToString(" ") { "%02X".format(it) }
-
-                state = state.copy(response = hex, error = null, lastRequestHex = hexRequest)
-            } catch (e: Exception) {
-                state = state.copy(error = "Ошибка: ${e.message}")
-            }
-        }
-    }
-
+    /**
+     * Отправка сгенерированного запроса
+     */
     fun sendGeneratedRequest() {
         scope.launch {
             try {
@@ -96,18 +81,58 @@ class RequestViewModel(
                 val hex = response.joinToString(" ") { "%02X".format(it) }
                 val hexRequest = request.joinToString(" ") { "%02X".format(it) }
 
-                state = state.copy(response = hex, error = null, lastRequestHex = hexRequest)
+                updateState(state.copy(response = hex, error = null, lastRequestHex = hexRequest))
+                NotificationManager.show("Запрос успешно отправлен")
             } catch (e: Exception) {
-                state = state.copy(error = "Ошибка: ${e.message}")
+                updateState(state.copy(error = "Ошибка: ${e.message}"))
+                NotificationManager.show("Ошибка: ${e.message}")
             }
         }
     }
+    
+    /**
+     * Отправка произвольного запроса, введенного пользователем
+     */
+    fun sendRawRequest() {
+        scope.launch {
+            try {
+                val bytes = state.rawRequest.split(" ")
+                    .filter { it.isNotBlank() }
+                    .map { it.toInt(16).toByte() }
+                    .toByteArray()
 
+                val response = sendRequestUseCase.sendRequest(
+                    portName = state.selectedPort,
+                    baudRate = state.baudRate.toInt(),
+                    dataBits = state.dataBits.toInt(),
+                    stopBits = state.stopBits.toInt(),
+                    request = bytes
+                )
+
+                val hexRequest = bytes.joinToString(" ") { "%02X".format(it) }
+                val hex = response.joinToString(" ") { "%02X".format(it) }
+
+                updateState(state.copy(response = hex, error = null, lastRequestHex = hexRequest))
+                NotificationManager.show("Ручной запрос успешно отправлен")
+            } catch (e: Exception) {
+                updateState(state.copy(error = "Ошибка: ${e.message}"))
+                NotificationManager.show("Ошибка: ${e.message}")
+            }
+        }
+    }
+    
+    /**
+     * Получение форматированного ответа согласно выбранному режиму отображения
+     */
     fun getFormattedResponse(): String {
+        val response = state.response
+        val displayMode = state.displayMode
+        val byteOrder = state.byteOrder
+        
         return formatResponseUseCase.execute(
-            response = state.response,
-            displayMode = state.displayMode,
-            byteOrder = state.byteOrder
+            response = response,
+            displayMode = displayMode,
+            byteOrder = byteOrder
         )
     }
 } 

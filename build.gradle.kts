@@ -38,16 +38,11 @@ dependencies {
     // Koin для Compose Desktop
     implementation("io.insert-koin:koin-compose:4.0.4")
 
-
-
-
-
-
     testImplementation(kotlin("test"))
 }
 compose.desktop {
     application {
-        mainClass = "MainKt" // убедись, что твой main находится в этом файле
+        mainClass = "org.example.MainKt" // исправляем путь до главного класса
     }
 }
 

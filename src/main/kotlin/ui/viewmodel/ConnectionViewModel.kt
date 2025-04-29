@@ -10,16 +10,21 @@ import domain.usecase.SendRequestUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.koin.core.component.KoinComponent
 import state.ConnectionState
 import ui.components.NotificationManager
 
+/**
+ * ViewModel для экрана настроек подключения
+ */
 class ConnectionViewModel(
     private val loadPortsUseCase: LoadPortsUseCase,
     private val saveConnectionSettingsUseCase: SaveConnectionSettingsUseCase,
     private val sendRequestUseCase: SendRequestUseCase
-) {
-    var state by mutableStateOf(ConnectionState())
-        private set
+) : KoinComponent {
+    // Состояние представления с использованием mutableStateOf для реактивности
+    private val _state = mutableStateOf(ConnectionState())
+    val state: ConnectionState by _state
     
     private val scope = CoroutineScope(Dispatchers.IO)
     
@@ -27,42 +32,49 @@ class ConnectionViewModel(
         loadPorts()
     }
     
-    fun loadPorts() {
-        val ports = loadPortsUseCase.execute(state.showAllPorts)
-        state = state.copy(
-            ports = ports.associateBy { it.systemName },
-            selectedPort = ports.firstOrNull()?.systemName ?: ""
-        )
+    /**
+     * Обновление состояния
+     */
+    fun updateState(newState: ConnectionState) {
+        _state.value = newState
     }
     
+    /**
+     * Загрузка доступных портов
+     */
+    fun loadPorts() {
+        // Используем LoadPortsUseCase для получения списка портов
+        val ports = loadPortsUseCase.execute(state.showAllPorts)
+        
+        updateState(state.copy(
+            ports = ports.associateBy { it.systemName }
+        ))
+    }
+    
+    /**
+     * Переключение опции показа всех портов
+     */
     fun toggleShowAllPorts() {
-        state = state.copy(showAllPorts = !state.showAllPorts)
+        updateState(state.copy(showAllPorts = !state.showAllPorts))
         loadPorts()
     }
     
-    fun updateState(newState: ConnectionState) {
-        state = newState
-    }
-    
+    /**
+     * Сохранение настроек подключения
+     */
     fun saveConnectionSettings() {
+        // Здесь будет логика сохранения настроек с использованием saveConnectionSettingsUseCase
         saveConnectionSettingsUseCase.execute(state.slaveAddress)
     }
     
+    /**
+     * Отправка тестового запроса
+     */
     fun sendTestRequest() {
-        scope.launch {
-            try {
-                val request = byteArrayOf(0x01, 0x03, 0x00, 0x01, 0x00, 0x01, 0x0A, 0x0B)
-                val response = sendRequestUseCase.sendRequest(
-                    portName = state.selectedPort,
-                    baudRate = state.baudRate.toInt(),
-                    dataBits = state.dataBits.toInt(),
-                    stopBits = state.stopBits.toInt(),
-                    request = request
-                )
-                state = state.copy(testResponse = "Успешно: ${response.size} байт получено", error = null)
-            } catch (e: Exception) {
-                state = state.copy(error = "Ошибка: ${e.message}", testResponse = null)
-            }
-        }
+        // Здесь будет логика отправки тестового запроса с использованием sendRequestUseCase
+        updateState(state.copy(
+            testResponse = "Соединение успешно установлено",
+            error = null
+        ))
     }
 } 

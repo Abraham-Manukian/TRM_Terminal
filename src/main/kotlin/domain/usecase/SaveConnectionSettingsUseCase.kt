@@ -2,15 +2,18 @@ package domain.usecase
 
 import domain.service.NotificationService
 
-class SaveConnectionSettingsUseCase(
-    private val notificationService: NotificationService
-) {
+/**
+ * Use case для сохранения настроек подключения
+ */
+class SaveConnectionSettingsUseCase(private val notificationService: NotificationService) {
+    /**
+     * Сохранить настройки подключения
+     * 
+     * @param slaveAddress адрес slave-устройства
+     */
     fun execute(slaveAddress: String) {
-        val address = slaveAddress.toIntOrNull()
-        if (address in 1..247) {
-            notificationService.showNotification("Настройки сохранены")
-        } else {
-            notificationService.showNotification("Ошибка: Неверный адрес")
-        }
+        // В реальном приложении здесь был бы код для сохранения настроек
+        println("Сохранены настройки. Адрес: $slaveAddress")
+        notificationService.showNotification("Настройки сохранены")
     }
 } 

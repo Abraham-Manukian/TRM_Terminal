@@ -3,9 +3,6 @@ package ui.screen
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
@@ -14,22 +11,23 @@ import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.Brightness7
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.DataUsage
+import androidx.compose.material.icons.filled.List
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import org.koin.compose.koinInject
+import ui.components.AnimatedButton
 import ui.viewmodel.ConnectionViewModel
 import ui.viewmodel.MainMenuViewModel
 import ui.viewmodel.RequestViewModel
+import ui.viewmodel.SelectRegistersViewModel
 
 class MainMenuScreen(
     private val viewModel: MainMenuViewModel
@@ -40,6 +38,7 @@ class MainMenuScreen(
         val navigator = LocalNavigator.current
         val connectionViewModel = koinInject<ConnectionViewModel>()
         val requestViewModel = koinInject<RequestViewModel>()
+        val selectRegistersViewModel = koinInject<SelectRegistersViewModel>()
         var visible by remember { mutableStateOf(false) }
         
         // Запуск анимации появления при первом отображении
@@ -124,6 +123,15 @@ class MainMenuScreen(
                             primaryColor = MaterialTheme.colors.primary, 
                             secondaryColor = MaterialTheme.colors.primaryVariant
                         )
+                        
+                        // Кнопка выбора регистров с анимациями
+                        AnimatedButton(
+                            onClick = { navigator?.push(SelectRegistersScreen(selectRegistersViewModel)) },
+                            icon = Icons.Default.List,
+                            text = "Выбор регистров",
+                            primaryColor = MaterialTheme.colors.primary, 
+                            secondaryColor = MaterialTheme.colors.primaryVariant
+                        )
                     }
                 }
             }
@@ -148,75 +156,6 @@ class MainMenuScreen(
                         rotationZ = rotation
                     }
                 )
-            }
-        }
-    }
-
-    @Composable
-    private fun AnimatedButton(
-        onClick: () -> Unit,
-        icon: androidx.compose.ui.graphics.vector.ImageVector,
-        text: String,
-        primaryColor: Color,
-        secondaryColor: Color
-    ) {
-        val interactionSource = remember { MutableInteractionSource() }
-        val isPressed by interactionSource.collectIsPressedAsState()
-        val isHovered by interactionSource.collectIsHoveredAsState()
-        
-        // Анимируем размер кнопки при нажатии
-        val scale by animateFloatAsState(
-            targetValue = if (isPressed) 0.95f else 1f,
-            animationSpec = tween(150, easing = EaseInOutCubic)
-        )
-        
-        // Анимируем цвет фона кнопки при наведении
-        val gradientColors = if (isHovered || isPressed) {
-            listOf(secondaryColor, primaryColor)
-        } else {
-            listOf(primaryColor, primaryColor)
-        }
-
-        Button(
-            onClick = onClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                },
-            shape = RoundedCornerShape(12.dp),
-            interactionSource = interactionSource,
-            elevation = ButtonDefaults.elevation(
-                defaultElevation = if (isHovered) 6.dp else 2.dp,
-                pressedElevation = 8.dp
-            ),
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        brush = Brush.horizontalGradient(gradientColors)
-                    )
-                    .padding(vertical = 12.dp, horizontal = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        icon, 
-                        contentDescription = null, 
-                        tint = MaterialTheme.colors.onPrimary
-                    )
-                    Text(
-                        text,
-                        style = MaterialTheme.typography.button,
-                        color = MaterialTheme.colors.onPrimary
-                    )
-                }
             }
         }
     }
