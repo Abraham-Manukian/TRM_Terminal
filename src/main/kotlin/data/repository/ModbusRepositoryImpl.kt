@@ -1,24 +1,52 @@
 package data.repository
 
-import data.datasource.ModbusDataSource
+import com.fazecast.jSerialComm.SerialPort
+import core.CRC16Modbus
+import domain.model.PortConfig
 import domain.repository.ModbusRepository
 
-/**
- * Реализация репозитория для работы с Modbus-устройствами
- */
-class ModbusRepositoryImpl(private val modbusDataSource: ModbusDataSource) : ModbusRepository {
+class ModbusRepositoryImpl : ModbusRepository {
 
-    override suspend fun sendRequest(
-        portName: String,
-        baudRate: Int,
-        dataBits: Int,
-        stopBits: Int,
-        request: ByteArray
-    ): ByteArray {
-        return modbusDataSource.sendRequest(portName, baudRate, dataBits, stopBits, request)
+    override fun getAvailablePorts(showAll: Boolean): Map<String, String> {
+        return SerialPort.getCommPorts()
+            .filter {
+                showAll || it.descriptivePortName.contains("CP21", ignoreCase = true)
+            }
+            .associateBy(
+                keySelector = { it.systemPortName },
+                valueTransform = { "${it.systemPortName} (${it.descriptivePortName})" }
+            )
+    }
+
+    override fun sendRequest(config: PortConfig, request: ByteArray): ByteArray {
+        val port = SerialPort.getCommPort(config.portName)
+        port.setComPortParameters(config.baudRate, config.dataBits, config.stopBits, 0)
+        port.openPort()
+
+        port.writeBytes(request, request.size)
+        Thread.sleep(20)
+
+        val buffer = ByteArray(256)
+        val read = port.readBytes(buffer, buffer.size)
+        port.closePort()
+
+        return buffer.take(read).toByteArray()
     }
 
     override fun generateRequest(slave: Int, function: Int, address: Int, quantity: Int): ByteArray {
-        return modbusDataSource.generateRequest(slave, function, address, quantity)
+        val req = mutableListOf<Byte>()
+        req.add(slave.toByte())
+        req.add(function.toByte())
+        req.add((address shr 8).toByte())
+        req.add((address and 0xFF).toByte())
+        req.add((quantity shr 8).toByte())
+        req.add((quantity and 0xFF).toByte())
+
+        val crc = CRC16Modbus()
+        crc.update(req.toByteArray())
+        val crcBytes = crc.crcBytes
+
+        req.addAll(crcBytes.toList())
+        return req.toByteArray()
     }
-} 
+}

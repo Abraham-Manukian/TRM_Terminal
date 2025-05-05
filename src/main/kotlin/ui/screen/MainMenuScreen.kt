@@ -26,18 +26,15 @@ import org.koin.compose.koinInject
 import ui.components.AnimatedButton
 import ui.viewmodel.ConnectionViewModel
 import ui.viewmodel.MainMenuViewModel
-import ui.viewmodel.RequestViewModel
 import ui.viewmodel.SelectRegistersViewModel
 
-class MainMenuScreen(
-    private val viewModel: MainMenuViewModel
-) : Screen {
+class MainMenuScreen() : Screen {
 
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.current
+        val mainMenuViewModel = koinInject<MainMenuViewModel>()
         val connectionViewModel = koinInject<ConnectionViewModel>()
-        val requestViewModel = koinInject<RequestViewModel>()
         val selectRegistersViewModel = koinInject<SelectRegistersViewModel>()
         var visible by remember { mutableStateOf(false) }
         
@@ -74,7 +71,7 @@ class MainMenuScreen(
                         .padding(16.dp)
                         .shadow(
                             elevation = animateDpAsState(
-                                targetValue = if (viewModel.themeState.isDarkTheme) 12.dp else 8.dp,
+                                targetValue = if (mainMenuViewModel.isDarkTheme.value) 12.dp else 8.dp,
                                 animationSpec = tween(500)
                             ).value,
                             shape = RoundedCornerShape(16.dp)
@@ -117,7 +114,7 @@ class MainMenuScreen(
 
                         // Кнопка опроса данных с анимациями
                         AnimatedButton(
-                            onClick = { navigator?.push(RequestScreen(requestViewModel)) },
+                            onClick = { navigator?.push(RequestScreen()) },
                             icon = Icons.Default.DataUsage,
                             text = "Опрос данных",
                             primaryColor = MaterialTheme.colors.primary, 
@@ -138,18 +135,18 @@ class MainMenuScreen(
 
             // Анимированная кнопка переключения темы
             val rotation by animateFloatAsState(
-                targetValue = if (viewModel.themeState.isDarkTheme) 180f else 0f,
+                targetValue = if (mainMenuViewModel.isDarkTheme.value) 180f else 0f,
                 animationSpec = tween(500, easing = EaseInOutCubic)
             )
 
             IconButton(
-                onClick = { viewModel.toggleTheme() },
+                onClick = {  mainMenuViewModel.toggleTheme() },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(16.dp)
             ) {
                 Icon(
-                    imageVector = if (viewModel.themeState.isDarkTheme) Icons.Default.Brightness7 else Icons.Default.Brightness4,
+                    imageVector = if (mainMenuViewModel.isDarkTheme.value) Icons.Default.Brightness7 else Icons.Default.Brightness4,
                     contentDescription = "Переключение темы",
                     tint = MaterialTheme.colors.onBackground,
                     modifier = Modifier.graphicsLayer {

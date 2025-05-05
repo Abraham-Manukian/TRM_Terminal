@@ -1,5 +1,6 @@
 package org.example
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import cafe.adriel.voyager.navigator.Navigator
@@ -15,9 +16,9 @@ fun main() = application {
         modules(appModule)
     }) {
         val viewModel = koinInject<MainMenuViewModel>()
-        AppTheme(isDark = viewModel.themeState.isDarkTheme) {
+        AppTheme(isDark = viewModel.isDarkTheme) {
             Window(onCloseRequest = ::exitApplication, title = "TRM1 Terminal") {
-                Navigator(screen = MainMenuScreen(viewModel))
+                Navigator(screen = MainMenuScreen())
             }
         }
     }

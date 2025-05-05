@@ -12,6 +12,7 @@ repositories {
     mavenCentral()
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
 }
+val voyager_vresion = "1.0.1"
 
 dependencies {
     implementation(compose.desktop.currentOs)
@@ -21,6 +22,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
     implementation("com.darkrockstudios:mpfilepicker:1.0.0")
 
+    // Корутины
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.7.3") // Main диспетчер для Swing/Desktop
+
     implementation("org.jetbrains.compose.runtime:runtime:1.5.12")
     implementation("org.jetbrains.compose.runtime:runtime-saveable:1.5.12")
     implementation("org.jetbrains.compose.material:material:1.5.12")
@@ -29,8 +34,13 @@ dependencies {
     implementation("org.jetbrains.compose.material:material-icons-extended-desktop:1.5.12")
 
     //Переходы экарнов
-    implementation("cafe.adriel.voyager:voyager-navigator:1.0.1")
-    implementation("cafe.adriel.voyager:voyager-core:1.0.1")
+    implementation("cafe.adriel.voyager:voyager-navigator:$voyager_vresion")
+    implementation("cafe.adriel.voyager:voyager-core:$voyager_vresion")
+    implementation("cafe.adriel.voyager:voyager-screenmodel:$voyager_vresion")
+    implementation("cafe.adriel.voyager:voyager-navigator-desktop:$voyager_vresion")
+    implementation("cafe.adriel.voyager:voyager-bottom-sheet-navigator-desktop:$voyager_vresion")
+    implementation("cafe.adriel.voyager:voyager-transitions-desktop:$voyager_vresion")
+    implementation("cafe.adriel.voyager:voyager-tab-navigator-desktop:$voyager_vresion")
 
     // Koin Core
     implementation("io.insert-koin:koin-core:4.0.4")
@@ -42,7 +52,7 @@ dependencies {
 }
 compose.desktop {
     application {
-        mainClass = "org.example.MainKt" // исправляем путь до главного класса
+        mainClass = "MainKt"
     }
 }
 

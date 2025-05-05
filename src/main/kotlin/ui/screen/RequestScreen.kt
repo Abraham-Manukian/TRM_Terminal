@@ -3,6 +3,8 @@ package ui.screen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -22,21 +24,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import ui.components.DropdownMenuField
 import ui.components.NotificationPopup
 import ui.viewmodel.RequestViewModel
 import state.DisplayMode
 import state.ByteOrder
+import java.lang.Thread.sleep
 
 
-class RequestScreen(
-    private val viewModel: RequestViewModel
-) : Screen {
+class RequestScreen() : Screen {
 
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.current
-        val state by remember { derivedStateOf { viewModel.state } }
         val colors = MaterialTheme.colors
         val tfColors = TextFieldDefaults.outlinedTextFieldColors(
             textColor = colors.onBackground,
@@ -47,6 +51,8 @@ class RequestScreen(
             unfocusedLabelColor = colors.onSurface.copy(alpha = 0.6f),
             backgroundColor = colors.surface.copy(alpha = 0.1f)
         )
+        val listModes = mutableListOf(DisplayMode.DEC, DisplayMode.HEX, DisplayMode.FLOAT)
+        val viewModel = koinInject<RequestViewModel>()
 
         Column(
             modifier = Modifier
@@ -82,17 +88,17 @@ class RequestScreen(
                             tint = colors.onPrimary
                         )
                     }
-                    
+
                     Spacer(modifier = Modifier.width(16.dp))
-                    
+
                     Icon(
                         Icons.Default.Send,
                         contentDescription = null,
                         tint = colors.onPrimary
                     )
-                    
+
                     Spacer(modifier = Modifier.width(8.dp))
-                    
+
                     Text(
                         "Окно запроса",
                         style = MaterialTheme.typography.h6.copy(
@@ -122,29 +128,28 @@ class RequestScreen(
                         color = colors.primary
                     )
 
-                    Row(
+                    LazyRow(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(24.dp)
                     ) {
-                        DisplayMode.values().forEach { mode ->
-                            val selected = state.displayMode == mode
+                        items(listModes) { mode ->
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(
-                                        if (selected) colors.primary.copy(alpha = 0.1f)
+                                        if (viewModel.state.value.displayMode == mode) colors.primary.copy(alpha = 0.1f)
                                         else Color.Transparent
                                     )
                                     .clickable {
-                                        viewModel.updateState(state.copy(displayMode = mode))
+                                        viewModel.state.value = viewModel.state.value.copy(displayMode = mode)
                                     }
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 RadioButton(
-                                    selected = selected,
+                                    selected = viewModel.state.value.displayMode == mode,
                                     onClick = null,
                                     colors = RadioButtonDefaults.colors(
                                         selectedColor = colors.primary
@@ -153,9 +158,9 @@ class RequestScreen(
                                 Text(
                                     text = mode.label,
                                     modifier = Modifier.padding(start = 4.dp, end = 8.dp),
-                                    color = if (selected) colors.primary else colors.onBackground,
+                                    color = if (viewModel.state.value.displayMode == mode) colors.primary else colors.onBackground,
                                     style = MaterialTheme.typography.body2.copy(
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                                        fontWeight = if (viewModel.state.value.displayMode == mode) FontWeight.Bold else FontWeight.Normal
                                     )
                                 )
                             }
@@ -165,11 +170,11 @@ class RequestScreen(
                     // Выпадающий список для выбора порядка байтов
                     DropdownMenuField(
                         label = "Порядок байтов",
-                        selected = state.byteOrder.label,
+                        selected = viewModel.state.value.byteOrder.label,
                         options = ByteOrder.values().map { it.label }
                     ) { label ->
                         val order = ByteOrder.values().find { it.label == label } ?: ByteOrder.ABCD
-                        viewModel.updateState(state.copy(byteOrder = order))
+                        viewModel.state.value = viewModel.state.value.copy(byteOrder = order)
                     }
 
                     // Информация о порядке байтов
@@ -191,7 +196,14 @@ class RequestScreen(
                     }
 
                     Button(
-                        onClick = { viewModel.sendGeneratedRequest() },
+                        onClick = {
+                            CoroutineScope(Dispatchers.IO).launch {
+                                while (true) {
+                                    viewModel.sendGeneratedRequest()
+                                    sleep(10)
+                                }
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -209,7 +221,7 @@ class RequestScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Отправить команду",
+                            "Старт ",
                             modifier = Modifier.padding(vertical = 4.dp),
                             style = MaterialTheme.typography.button.copy(
                                 fontWeight = FontWeight.Bold
@@ -239,8 +251,8 @@ class RequestScreen(
                     )
 
                     OutlinedTextField(
-                        value = state.rawRequest,
-                        onValueChange = { rawRequest -> viewModel.updateState(state.copy(rawRequest = rawRequest)) },
+                        value = viewModel.state.value.rawRequest,
+                        onValueChange = { rawRequest -> viewModel.state.value.copy(rawRequest = rawRequest) },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Hex-запрос") },
                         colors = tfColors,
@@ -295,16 +307,16 @@ class RequestScreen(
                             style = MaterialTheme.typography.caption,
                             color = colors.primary.copy(alpha = 0.7f)
                         )
-                        
+
                         Spacer(modifier = Modifier.height(4.dp))
-                        
+
                         Text(
-                            state.lastRequestHex,
+                            viewModel.state.value.lastRequestHex,
                             style = MaterialTheme.typography.body2,
                             color = colors.onSurface
                         )
                     }
-                    
+
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -313,13 +325,13 @@ class RequestScreen(
                             .padding(12.dp)
                     ) {
                         Text(
-                            "Ответ (${state.displayMode.name}):",
+                            "Ответ (${viewModel.state.value.displayMode.name}):",
                             style = MaterialTheme.typography.caption,
                             color = colors.primary.copy(alpha = 0.7f)
                         )
-                        
+
                         Spacer(modifier = Modifier.height(4.dp))
-                        
+
                         Text(
                             viewModel.getFormattedResponse(),
                             style = MaterialTheme.typography.body2,
@@ -328,9 +340,9 @@ class RequestScreen(
                     }
                 }
             }
-            
+
             // Блок с ошибками
-            state.error?.let { errorMessage ->
+            viewModel.state.value.error?.let { errorMessage ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     elevation = 2.dp,
@@ -357,7 +369,7 @@ class RequestScreen(
                 }
             }
         }
-        
+
         // Показ уведомлений
         NotificationPopup()
     }

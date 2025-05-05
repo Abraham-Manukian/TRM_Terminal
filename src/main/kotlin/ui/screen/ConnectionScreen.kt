@@ -11,9 +11,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
+import state.ConnectionState
 import ui.components.DropdownMenuField
 import ui.components.NotificationManager
 import ui.components.NotificationPopup
@@ -33,8 +33,10 @@ class ConnectionScreen(
 
     @Composable
     override fun Content() {
+        // Подписываемся на state через collectAsState
+        val state by viewModel.state.collectAsState()
+        
         val navigator = LocalNavigator.current
-        val state by remember { derivedStateOf { viewModel.state } }
         val colors = MaterialTheme.colors
         
         // Создаем улучшенные цвета для текстовых полей
@@ -141,7 +143,7 @@ class ConnectionScreen(
                         options = state.ports.values.map { it.displayName }
                     ) { selectedText ->
                         val selectedKey = state.ports.entries.find { it.value.displayName == selectedText }?.key ?: ""
-                        viewModel.updateState(state.copy(selectedPort = selectedKey))
+                        viewModel.selectPort(selectedKey)
                     }
 
                     Row(
@@ -168,8 +170,12 @@ class ConnectionScreen(
                         )
                     }
 
-                    DropdownMenuField("Скорость (бит/с)", state.baudRate, listOf("9600", "19200", "38400")) {
-                        viewModel.updateState(state.copy(baudRate = it))
+                    DropdownMenuField(
+                        "Скорость (бит/с)",
+                        state.baudRate,
+                        listOf("9600", "19200", "38400")
+                    ) { 
+                        viewModel.setBaudRate(it)
                     }
 
                     Row(
@@ -177,13 +183,21 @@ class ConnectionScreen(
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            DropdownMenuField("Биты данных", state.dataBits, listOf("7", "8")) {
-                                viewModel.updateState(state.copy(dataBits = it))
+                            DropdownMenuField(
+                                "Биты данных", 
+                                state.dataBits, 
+                                listOf("7", "8")
+                            ) {
+                                viewModel.setDataBits(it)
                             }
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            DropdownMenuField("Стоп-биты", state.stopBits, listOf("1", "2")) {
-                                viewModel.updateState(state.copy(stopBits = it))
+                            DropdownMenuField(
+                                "Стоп-биты", 
+                                state.stopBits, 
+                                listOf("1", "2")
+                            ) {
+                                viewModel.setStopBits(it)
                             }
                         }
                     }
@@ -199,42 +213,32 @@ class ConnectionScreen(
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        "Параметры устройства",
+                        "Адрес Modbus устройства",
                         style = MaterialTheme.typography.subtitle1.copy(
                             fontWeight = FontWeight.Bold
                         ),
                         color = colors.primary
                     )
-
+                    
                     OutlinedTextField(
                         value = state.slaveAddress,
-                        onValueChange = {
+                        onValueChange = { 
                             if (it.all { c -> c.isDigit() } && (it.toIntOrNull() ?: 0) <= 999)
-                                viewModel.updateState(state.copy(slaveAddress = it))
+                                viewModel.setSlaveAddress(it)
                         },
-                        label = { Text("Адрес устройства (1–247)") },
+                        label = { Text("Адрес (1-247)") },
                         singleLine = true,
                         isError = state.slaveAddress.toIntOrNull() !in 1..247,
                         modifier = Modifier.fillMaxWidth(),
                         colors = tfColors,
                         shape = RoundedCornerShape(8.dp)
                     )
-
-                    if (state.slaveAddress.toIntOrNull() !in 1..247) {
-                        Text(
-                            "Введите число от 1 до 247",
-                            color = colors.error,
-                            style = MaterialTheme.typography.caption
-                        )
-                    }
                 }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
+            
             // Кнопки с улучшенным дизайном
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -252,19 +256,9 @@ class ConnectionScreen(
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(
                             backgroundColor = colors.primary
-                        ),
-                        elevation = ButtonDefaults.elevation(
-                            defaultElevation = 4.dp,
-                            pressedElevation = 8.dp
                         )
                     ) {
-                        Text(
-                            "Сохранить",
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            style = MaterialTheme.typography.button.copy(
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
+                        Text("Сохранить")
                     }
                     
                     OutlinedButton(
@@ -275,68 +269,40 @@ class ConnectionScreen(
                             contentColor = colors.primary
                         )
                     ) {
-                        Text(
-                            "Проверить соединение",
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            style = MaterialTheme.typography.button
-                        )
+                        Text("Проверить соединение")
                     }
                 }
             }
             
-            // Блок с результатами тестирования
-            state.testResponse?.let {
+            // Результат тестового соединения
+            state.testResponse?.let { response ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     elevation = 2.dp,
-                    shape = RoundedCornerShape(12.dp),
-                    backgroundColor = Color(0xFF263238)
+                    backgroundColor = Color(0xFFE8F5E9),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-                    Column(
+                    Text(
+                        text = response,
+                        color = Color(0xFF2E7D32),
                         modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            "Результат теста:",
-                            color = Color.White,
-                            style = MaterialTheme.typography.subtitle2.copy(
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            it,
-                            color = Color.LightGray,
-                            style = MaterialTheme.typography.body2
-                        )
-                    }
+                    )
                 }
             }
             
-            // Блок с ошибками
-            state.error?.let {
+            // Отображение ошибки
+            state.error?.let { errorText ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     elevation = 2.dp,
-                    shape = RoundedCornerShape(12.dp),
-                    backgroundColor = colors.error.copy(alpha = 0.1f)
+                    backgroundColor = Color(0xFFFFEBEE),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-                    Column(
+                    Text(
+                        text = errorText,
+                        color = Color(0xFFB71C1C),
                         modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            "Ошибка:",
-                            color = colors.error,
-                            style = MaterialTheme.typography.subtitle2.copy(
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            it,
-                            color = colors.error,
-                            style = MaterialTheme.typography.body2
-                        )
-                    }
+                    )
                 }
             }
         }

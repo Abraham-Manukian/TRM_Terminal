@@ -3,45 +3,45 @@ package data.datasource
 import com.fazecast.jSerialComm.SerialPort
 import core.CRC16Modbus
 import java.io.IOException
+import java.lang.Thread.sleep
 
-/**
- * Реализация источника данных для работы с Modbus-устройствами
- */
+lateinit var port: SerialPort
+
 class ModbusDataSourceImpl : ModbusDataSource {
-    
-    @OptIn(ExperimentalStdlibApi::class)
-    override fun sendRequest(portName: String, baudRate: Int, dataBits: Int, stopBits: Int, request: ByteArray): ByteArray {
-        val port = SerialPort.getCommPort(portName)
+
+    init {
+        port = SerialPort.getCommPorts().find { it.portDescription.contains("CP2103 USB to RS-485") }!!
+        port.setComPortParameters(38400, 8, 1, 0)
+        port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING, 100, 100)
+        port.openPort()
+    }
+
+    override fun sendRequest(
+        portName: String, baudRate: Int, dataBits: Int, stopBits: Int, request: ByteArray
+    ): ByteArray {
         try {
-            port.setComPortParameters(baudRate, dataBits, stopBits, 0)
-            if (!port.openPort()) {
-                throw IOException("Не удалось открыть порт $portName")
-            }
-            
+            val buffer = ByteArray(256)
+            port.flushIOBuffers()
+
             val bytesWritten = port.writeBytes(request, request.size)
             if (bytesWritten != request.size) {
                 throw IOException("Ошибка при отправке данных: отправлено $bytesWritten из ${request.size} байт")
             }
-            
-            Thread.sleep(20)
+            var read: Int
+            do {
+                read = port.readBytes(buffer, buffer.size)
+                sleep(1)
+            } while (read == 0)
 
-            val buffer = ByteArray(256)
-            val read = port.readBytes(buffer, buffer.size)
-            
-            if (read <= 0) {
-                throw IOException("Не получен ответ от устройства")
-            }
-            
-            println("Отправлено: ${request.toHexString()}")
-            println("Получено ${read} байт")
-            
             return buffer.take(read).toByteArray()
         } catch (e: Exception) {
+            e.printStackTrace()
             throw IOException("Ошибка работы с портом: ${e.message}", e)
         } finally {
-            if (port.isOpen) {
-                port.closePort()
-            }
+//            if (port.isOpen) {
+//                println("Закрываем порт")
+//                port.closePort()
+//            }
         }
     }
 

@@ -48,11 +48,7 @@ class FormatResponseUseCase {
                     // Извлечь полезные данные из Modbus ответа
                     val data = if (bytes.size >= 5) bytes.drop(3).dropLast(2).toList() else bytes.toList()
                     
-                    // Вывести отладочную информацию о байтах
-                    val bytesHex = data.joinToString(" ") { byte -> "%02X".format(byte) }
-                    val debugInfo = "Байты: $bytesHex\n"
-                    
-                    debugInfo + data.windowed(4, 4, true).mapIndexed { index, group ->
+                    data.windowed(4, 4, true).mapIndexed { index, group ->
                         if (group.size == 4) {
                             try {
                                 // Переупорядочивание байтов в соответствии с выбранным порядком
@@ -75,14 +71,13 @@ class FormatResponseUseCase {
                                 buffer.order(javaByteOrder)
                                 
                                 val float = buffer.getFloat(0)
-                                val rawHex = byteArray.joinToString(" ") { byte -> "%02X".format(byte) }
-                                "Float $index = %.3f [%s]".format(float, rawHex)
+                                
+                                "Значение = $float"
                             } catch (e: Exception) {
-                                "Float $index = Ошибка декодирования: ${e.message}"
+                                "Ошибка декодирования: ${e.message}"
                             }
                         } else {
-                            val available = group.joinToString(" ") { byte -> "%02X".format(byte) }
-                            "Float $index = Недостаточно байт (нужно 4, получено ${group.size}): [$available]"
+                            "Недостаточно байт (нужно 4, получено ${group.size})"
                         }
                     }.joinToString("\n")
                 } catch (e: Exception) {

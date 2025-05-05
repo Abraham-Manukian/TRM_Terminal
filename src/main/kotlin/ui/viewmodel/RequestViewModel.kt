@@ -1,138 +1,132 @@
 package ui.viewmodel
 
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import domain.usecase.FormatResponseUseCase
 import domain.usecase.GenerateRequestUseCase
 import domain.usecase.LoadPortsUseCase
-import domain.usecase.SendRequestUseCase
+import domain.usecase.SendRawRequestUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import state.RequestState
 import ui.components.NotificationManager
+import kotlin.onFailure
 
-/**
- * ViewModel для экрана отправки запросов
- */
 class RequestViewModel(
-    private val sendRequestUseCase: SendRequestUseCase,
+    private val sendRawRequestUseCase: SendRawRequestUseCase,
     private val generateRequestUseCase: GenerateRequestUseCase,
     private val formatResponseUseCase: FormatResponseUseCase,
     private val loadPortsUseCase: LoadPortsUseCase
 ) : KoinComponent {
-    // Состояние представления с использованием mutableStateOf для реактивности
-    private val _state = mutableStateOf(RequestState())
-    val state: RequestState by _state
-    
+
+    val state = mutableStateOf(RequestState())
+
     private val scope = CoroutineScope(Dispatchers.IO)
-    
+    private var isRequestInProgress = false
+
     init {
         loadPorts()
     }
-    
+
     fun loadPorts() {
-        val ports = loadPortsUseCase.execute(state.showAllPorts)
-        updateState(state.copy(
+        val showAll = state.value.connectionState.showAllPorts
+        val ports = loadPortsUseCase.execute(showAll)
+        val firstPort = ports.firstOrNull()?.systemName.orEmpty()
+
+        val newConnectionState = state.value.connectionState.copy(
             ports = ports.associateBy { it.systemName },
-            selectedPort = ports.firstOrNull()?.systemName ?: ""
-        ))
+            selectedPort = firstPort
+        )
+
+        state.value = state.value.copy(connectionState = newConnectionState)
     }
-    
+
     fun toggleShowAllPorts() {
-        updateState(state.copy(showAllPorts = !state.showAllPorts))
+        val toggled = state.value.connectionState.copy(
+            showAllPorts = !state.value.connectionState.showAllPorts
+        )
+        state.value = state.value.copy(connectionState = toggled)
         loadPorts()
     }
-    
-    /**
-     * Обновление состояния
-     */
-    fun updateState(newState: RequestState) {
-        _state.value = newState
-    }
-    
-    /**
-     * Отправка сгенерированного запроса
-     */
+
     fun sendGeneratedRequest() {
+        if (isRequestInProgress) {
+            NotificationManager.show("Дождитесь завершения предыдущего запроса")
+            return
+        }
+
+        isRequestInProgress = true
+        state.value = state.value.copy(error = null)
+
         scope.launch {
             try {
-                val functionCode = when (state.requestType) {
+                val type = state.value.requestType
+                val functionCode = when (type) {
                     "Read Holding Registers" -> 0x03
                     "Write Single Register" -> 0x06
                     else -> 0x03
                 }
 
-                val slave = state.slaveAddress.toIntOrNull()?.takeIf { it in 1..247 } ?: 1
-                val address = state.address.toIntOrNull() ?: 0
-                val quantity = state.quantity.toIntOrNull() ?: 1
+                val slave = state.value.connectionState.slaveAddress.toIntOrNull()?.coerceIn(1..247) ?: 1
+                val address = state.value.address.toIntOrNull() ?: 0
+                val quantity = state.value.quantity.toIntOrNull() ?: 1
 
                 val request = generateRequestUseCase.execute(slave, functionCode, address, quantity)
+                val config = state.value.connectionState.toPortConfig()
 
-                val response = sendRequestUseCase.sendRequest(
-                    portName = state.selectedPort,
-                    baudRate = state.baudRate.toInt(),
-                    dataBits = state.dataBits.toInt(),
-                    stopBits = state.stopBits.toInt(),
-                    request = request
-                )
+                val result = sendRawRequestUseCase(request.joinToString(" ") { "%02X".format(it) }, config)
 
-                val hex = response.joinToString(" ") { "%02X".format(it) }
-                val hexRequest = request.joinToString(" ") { "%02X".format(it) }
-
-                updateState(state.copy(response = hex, error = null, lastRequestHex = hexRequest))
-                NotificationManager.show("Запрос успешно отправлен")
+                result.onSuccess { pair ->
+                    val (req, resp) = pair
+                    state.value = state.value.copy(
+                        lastRequestHex = req.joinToString(" ") { "%02X".format(it) },
+                        response = resp.joinToString(" ") { "%02X".format(it) },
+                        error = null
+                    )
+                    NotificationManager.show("Запрос успешно отправлен")
+                }.onFailure {
+                    state.value = state.value.copy(error = "Ошибка: ${it.message}")
+                    NotificationManager.show("Ошибка: ${it.message}")
+                }
             } catch (e: Exception) {
-                updateState(state.copy(error = "Ошибка: ${e.message}"))
+                state.value = state.value.copy(error = "Ошибка: ${e.message}")
                 NotificationManager.show("Ошибка: ${e.message}")
+            } finally {
+                isRequestInProgress = false
             }
         }
     }
-    
-    /**
-     * Отправка произвольного запроса, введенного пользователем
-     */
+
     fun sendRawRequest() {
         scope.launch {
             try {
-                val bytes = state.rawRequest.split(" ")
-                    .filter { it.isNotBlank() }
-                    .map { it.toInt(16).toByte() }
-                    .toByteArray()
+                val config = state.value.connectionState.toPortConfig()
+                val raw = state.value.rawRequest
 
-                val response = sendRequestUseCase.sendRequest(
-                    portName = state.selectedPort,
-                    baudRate = state.baudRate.toInt(),
-                    dataBits = state.dataBits.toInt(),
-                    stopBits = state.stopBits.toInt(),
-                    request = bytes
-                )
+                val result = sendRawRequestUseCase(raw, config)
 
-                val hexRequest = bytes.joinToString(" ") { "%02X".format(it) }
-                val hex = response.joinToString(" ") { "%02X".format(it) }
-
-                updateState(state.copy(response = hex, error = null, lastRequestHex = hexRequest))
-                NotificationManager.show("Ручной запрос успешно отправлен")
+                result.onSuccess { pair ->
+                    val (req, resp) = pair
+                    state.value = state.value.copy(
+                        lastRequestHex = req.joinToString(" ") { "%02X".format(it) },
+                        response = resp.joinToString(" ") { "%02X".format(it) },
+                        error = null
+                    )
+                }.onFailure {
+                    state.value = state.value.copy(error = "Ошибка: ${it.message}")
+                }
             } catch (e: Exception) {
-                updateState(state.copy(error = "Ошибка: ${e.message}"))
-                NotificationManager.show("Ошибка: ${e.message}")
+                state.value = state.value.copy(error = "Ошибка: ${e.message}")
             }
         }
     }
-    
-    /**
-     * Получение форматированного ответа согласно выбранному режиму отображения
-     */
+
     fun getFormattedResponse(): String {
-        val response = state.response
-        val displayMode = state.displayMode
-        val byteOrder = state.byteOrder
-        
         return formatResponseUseCase.execute(
-            response = response,
-            displayMode = displayMode,
-            byteOrder = byteOrder
+            response = state.value.response,
+            displayMode = state.value.displayMode,
+            byteOrder = state.value.byteOrder
         )
     }
 } 

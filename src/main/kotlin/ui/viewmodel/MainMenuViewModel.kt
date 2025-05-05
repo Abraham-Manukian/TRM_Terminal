@@ -1,17 +1,20 @@
 package ui.viewmodel
 
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
-import state.ThemeState
+import cafe.adriel.voyager.core.model.ScreenModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
-class MainMenuViewModel : KoinComponent {
-    var themeState by mutableStateOf(ThemeState())
-        private set
+class MainMenuViewModel : ScreenModel {
+
+    val isDarkTheme = mutableStateOf(false)
+    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         
     fun toggleTheme() {
-        themeState = themeState.copy(isDarkTheme = !themeState.isDarkTheme)
+        viewModelScope.launch {
+            isDarkTheme.value = !isDarkTheme.value
+        }
     }
 } 

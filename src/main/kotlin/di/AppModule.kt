@@ -20,22 +20,22 @@ val appModule = module {
     single<ModbusDataSource> { ModbusDataSourceImpl() }
     
     // Repositories
-    single<ModbusRepository> { ModbusRepositoryImpl(get()) }
+    single<ModbusRepository> { ModbusRepositoryImpl() }
     single<SerialPortRepository> { SerialPortRepositoryImpl() }
     
     // Services
     single<NotificationService> { NotificationServiceImpl() }
     
     // Use cases
-    single { SendRequestUseCase(get()) }
+    single { SendRawRequestUseCase(get()) }
     single { GenerateRequestUseCase(get()) }
     single { SaveConnectionSettingsUseCase(get()) }
     single { FormatResponseUseCase() }
     single { LoadPortsUseCase(get()) }
     
     // ViewModels
-    factory { MainMenuViewModel() }
-    factory { ConnectionViewModel(get(), get(), get()) }
-    factory { RequestViewModel(get(), get(), get(), get()) }
-    factory { SelectRegistersViewModel() }
+    single { MainMenuViewModel() }
+    single { ConnectionViewModel(get(), get(), get()) }
+    single { RequestViewModel(get(), get(), get(), get()) }
+    single { SelectRegistersViewModel() }
 }

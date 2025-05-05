@@ -1,12 +1,12 @@
 package domain.repository
 
+import domain.model.PortConfig
+
+
 interface ModbusRepository {
-    suspend fun sendRequest(portName: String,
-                            baudRate: Int,
-                            dataBits: Int,
-                            stopBits: Int,
-                            request: ByteArray
-    ) : ByteArray
-    
+    fun getAvailablePorts(showAll: Boolean): Map<String, String>
+    fun sendRequest(config: PortConfig, request: ByteArray): ByteArray
     fun generateRequest(slave: Int, function: Int, address: Int, quantity: Int): ByteArray
 }
+
+
