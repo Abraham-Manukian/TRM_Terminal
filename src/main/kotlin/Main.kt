@@ -16,7 +16,8 @@ fun main() = application {
         modules(appModule)
     }) {
         val viewModel = koinInject<MainMenuViewModel>()
-        AppTheme(isDark = viewModel.isDarkTheme) {
+        val themeState = viewModel.state.collectAsState()
+        AppTheme(isDark = themeState.value.isDarkTheme) {
             Window(onCloseRequest = ::exitApplication, title = "TRM1 Terminal") {
                 Navigator(screen = MainMenuScreen())
             }

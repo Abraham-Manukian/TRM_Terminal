@@ -37,6 +37,8 @@ class MainMenuScreen() : Screen {
         val connectionViewModel = koinInject<ConnectionViewModel>()
         val selectRegistersViewModel = koinInject<SelectRegistersViewModel>()
         var visible by remember { mutableStateOf(false) }
+        val themeState by mainMenuViewModel.state.collectAsState()
+        val isDarkTheme = themeState.isDarkTheme
         
         // Запуск анимации появления при первом отображении
         LaunchedEffect(Unit) {
@@ -71,7 +73,7 @@ class MainMenuScreen() : Screen {
                         .padding(16.dp)
                         .shadow(
                             elevation = animateDpAsState(
-                                targetValue = if (mainMenuViewModel.isDarkTheme.value) 12.dp else 8.dp,
+                                targetValue = if (isDarkTheme) 12.dp else 8.dp,
                                 animationSpec = tween(500)
                             ).value,
                             shape = RoundedCornerShape(16.dp)
@@ -135,7 +137,7 @@ class MainMenuScreen() : Screen {
 
             // Анимированная кнопка переключения темы
             val rotation by animateFloatAsState(
-                targetValue = if (mainMenuViewModel.isDarkTheme.value) 180f else 0f,
+                targetValue = if (isDarkTheme) 180f else 0f,
                 animationSpec = tween(500, easing = EaseInOutCubic)
             )
 
@@ -146,7 +148,7 @@ class MainMenuScreen() : Screen {
                     .padding(16.dp)
             ) {
                 Icon(
-                    imageVector = if (mainMenuViewModel.isDarkTheme.value) Icons.Default.Brightness7 else Icons.Default.Brightness4,
+                    imageVector = if (isDarkTheme) Icons.Default.Brightness7 else Icons.Default.Brightness4,
                     contentDescription = "Переключение темы",
                     tint = MaterialTheme.colors.onBackground,
                     modifier = Modifier.graphicsLayer {

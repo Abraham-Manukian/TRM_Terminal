@@ -35,7 +35,7 @@ val appModule = module {
     
     // ViewModels
     single { MainMenuViewModel() }
-    single { ConnectionViewModel(get(), get(), get()) }
+    single { ConnectionViewModel(get(), get()) }
     single { RequestViewModel(get(), get(), get(), get()) }
     single { SelectRegistersViewModel() }
 }

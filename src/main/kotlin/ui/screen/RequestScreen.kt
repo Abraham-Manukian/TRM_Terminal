@@ -33,7 +33,9 @@ import ui.components.NotificationPopup
 import ui.viewmodel.RequestViewModel
 import state.DisplayMode
 import state.ByteOrder
+import state.RequestState
 import java.lang.Thread.sleep
+import androidx.compose.runtime.collectAsState
 
 
 class RequestScreen() : Screen {
@@ -51,8 +53,9 @@ class RequestScreen() : Screen {
             unfocusedLabelColor = colors.onSurface.copy(alpha = 0.6f),
             backgroundColor = colors.surface.copy(alpha = 0.1f)
         )
-        val listModes = mutableListOf(DisplayMode.DEC, DisplayMode.HEX, DisplayMode.FLOAT)
         val viewModel = koinInject<RequestViewModel>()
+        val state by viewModel.state.collectAsState()
+        val displayModes = DisplayMode.values().toList()
 
         Column(
             modifier = Modifier
@@ -134,33 +137,34 @@ class RequestScreen() : Screen {
                             .padding(vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(24.dp)
                     ) {
-                        items(listModes) { mode ->
+                        items(displayModes) { mode ->
+                            val isSelected = state.displayMode == mode
+
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(
-                                        if (viewModel.state.value.displayMode == mode) colors.primary.copy(alpha = 0.1f)
-                                        else Color.Transparent
+                                        if (isSelected) colors.primary.copy(alpha = 0.1f) else Color.Transparent
                                     )
                                     .clickable {
-                                        viewModel.state.value = viewModel.state.value.copy(displayMode = mode)
+                                        viewModel.setDisplayMode(mode)
                                     }
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 RadioButton(
-                                    selected = viewModel.state.value.displayMode == mode,
-                                    onClick = null,
+                                    selected = isSelected,
+                                    onClick = { viewModel.setDisplayMode(mode) },
                                     colors = RadioButtonDefaults.colors(
                                         selectedColor = colors.primary
                                     )
                                 )
                                 Text(
-                                    text = mode.label,
+                                    text = "${mode.name} (${getModeDescription(mode)})",
                                     modifier = Modifier.padding(start = 4.dp, end = 8.dp),
-                                    color = if (viewModel.state.value.displayMode == mode) colors.primary else colors.onBackground,
+                                    color = if (isSelected) colors.primary else colors.onBackground,
                                     style = MaterialTheme.typography.body2.copy(
-                                        fontWeight = if (viewModel.state.value.displayMode == mode) FontWeight.Bold else FontWeight.Normal
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                     )
                                 )
                             }
@@ -170,12 +174,10 @@ class RequestScreen() : Screen {
                     // Выпадающий список для выбора порядка байтов
                     DropdownMenuField(
                         label = "Порядок байтов",
-                        selected = viewModel.state.value.byteOrder.label,
-                        options = ByteOrder.values().map { it.label }
-                    ) { label ->
-                        val order = ByteOrder.values().find { it.label == label } ?: ByteOrder.ABCD
-                        viewModel.state.value = viewModel.state.value.copy(byteOrder = order)
-                    }
+                        selected = state.byteOrder.label,
+                        options = ByteOrder.values().map { it.label },
+                        onSelected = viewModel::setByteOrder
+                    )
 
                     // Информация о порядке байтов
                     Card(
@@ -251,8 +253,8 @@ class RequestScreen() : Screen {
                     )
 
                     OutlinedTextField(
-                        value = viewModel.state.value.rawRequest,
-                        onValueChange = { rawRequest -> viewModel.state.value.copy(rawRequest = rawRequest) },
+                        value = state.rawRequest,
+                        onValueChange = { viewModel.setRawRequest(it) },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Hex-запрос") },
                         colors = tfColors,
@@ -311,7 +313,7 @@ class RequestScreen() : Screen {
                         Spacer(modifier = Modifier.height(4.dp))
 
                         Text(
-                            viewModel.state.value.lastRequestHex,
+                            state.lastRequestHex,
                             style = MaterialTheme.typography.body2,
                             color = colors.onSurface
                         )
@@ -325,7 +327,7 @@ class RequestScreen() : Screen {
                             .padding(12.dp)
                     ) {
                         Text(
-                            "Ответ (${viewModel.state.value.displayMode.name}):",
+                            "Ответ (${state.displayMode.name}):",
                             style = MaterialTheme.typography.caption,
                             color = colors.primary.copy(alpha = 0.7f)
                         )
@@ -342,7 +344,7 @@ class RequestScreen() : Screen {
             }
 
             // Блок с ошибками
-            viewModel.state.value.error?.let { errorMessage ->
+            state.error?.let { errorMessage ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     elevation = 2.dp,
@@ -372,5 +374,14 @@ class RequestScreen() : Screen {
 
         // Показ уведомлений
         NotificationPopup()
+    }
+
+    // Добавим функцию для получения описания режима
+    fun getModeDescription(mode: DisplayMode): String {
+        return when (mode) {
+            DisplayMode.DEC -> "Десятичный"
+            DisplayMode.HEX -> "Шестнадцатеричный"
+            DisplayMode.FLOAT -> "Плавающая точка"
+        }
     }
 }

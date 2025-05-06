@@ -1,8 +1,6 @@
 package data.datasource
 
-/**
- * Интерфейс источника данных для работы с Modbus-устройствами
- */
+
 interface ModbusDataSource {
     /**
      * Отправить байты запроса и получить ответ

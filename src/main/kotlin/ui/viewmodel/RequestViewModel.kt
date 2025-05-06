@@ -1,26 +1,34 @@
 package ui.viewmodel
 
 import androidx.compose.runtime.mutableStateOf
+import cafe.adriel.voyager.core.model.ScreenModel
+import cafe.adriel.voyager.core.screen.Screen
 import domain.usecase.FormatResponseUseCase
 import domain.usecase.GenerateRequestUseCase
 import domain.usecase.LoadPortsUseCase
 import domain.usecase.SendRawRequestUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.koin.core.component.KoinComponent
+import state.ByteOrder
+import state.DisplayMode
 import state.RequestState
 import ui.components.NotificationManager
 import kotlin.onFailure
+
 
 class RequestViewModel(
     private val sendRawRequestUseCase: SendRawRequestUseCase,
     private val generateRequestUseCase: GenerateRequestUseCase,
     private val formatResponseUseCase: FormatResponseUseCase,
     private val loadPortsUseCase: LoadPortsUseCase
-) : KoinComponent {
+) : ScreenModel {
 
-    val state = mutableStateOf(RequestState())
+    private val _state = MutableStateFlow(RequestState())
+    val state: StateFlow<RequestState> = _state
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private var isRequestInProgress = false
@@ -29,24 +37,58 @@ class RequestViewModel(
         loadPorts()
     }
 
+    private val current get() = _state.value
+
+    private fun updateState(update: (RequestState) -> RequestState) {
+        _state.update(update)
+    }
+
     fun loadPorts() {
-        val showAll = state.value.connectionState.showAllPorts
-        val ports = loadPortsUseCase.execute(showAll)
+        val ports = loadPortsUseCase.execute(current.connectionState.showAllPorts)
         val firstPort = ports.firstOrNull()?.systemName.orEmpty()
 
-        val newConnectionState = state.value.connectionState.copy(
-            ports = ports.associateBy { it.systemName },
-            selectedPort = firstPort
-        )
+        updateState { state ->
+            state.copy(
+                connectionState = state.connectionState.copy(
+                    ports = ports.associateBy { it.systemName },
+                    selectedPort = firstPort
+                )
+            )
+        }
+    }
 
-        state.value = state.value.copy(connectionState = newConnectionState)
+    fun setByteOrder(order: ByteOrder) {
+        _state.update { it.copy(byteOrder = order) }
+    }
+
+    fun setDisplayMode(mode: DisplayMode) {
+        _state.update { it.copy(displayMode = mode) }
+    }
+
+    fun getModeDescription(mode: DisplayMode): String {
+        return when (mode) {
+            DisplayMode.DEC -> "Десятичный"
+            DisplayMode.HEX -> "Шестнадцатеричный"
+            DisplayMode.FLOAT -> "Плавающая точка"
+        }
+    }
+
+    fun setByteOrder(label: String) {
+        val order = ByteOrder.values().find { it.label == label } ?: ByteOrder.ABCD
+        updateState { it.copy(byteOrder = order) }
+    }
+
+    fun setRawRequest(value: String) {
+        updateState { it.copy(rawRequest = value) }
     }
 
     fun toggleShowAllPorts() {
-        val toggled = state.value.connectionState.copy(
-            showAllPorts = !state.value.connectionState.showAllPorts
-        )
-        state.value = state.value.copy(connectionState = toggled)
+        updateState { state ->
+            val toggled = state.connectionState.copy(
+                showAllPorts = !state.connectionState.showAllPorts
+            )
+            state.copy(connectionState = toggled)
+        }
         loadPorts()
     }
 
@@ -57,40 +99,41 @@ class RequestViewModel(
         }
 
         isRequestInProgress = true
-        state.value = state.value.copy(error = null)
+        updateState { it.copy(error = null) }
 
         scope.launch {
             try {
-                val type = state.value.requestType
+                val type = current.requestType
                 val functionCode = when (type) {
                     "Read Holding Registers" -> 0x03
                     "Write Single Register" -> 0x06
                     else -> 0x03
                 }
 
-                val slave = state.value.connectionState.slaveAddress.toIntOrNull()?.coerceIn(1..247) ?: 1
-                val address = state.value.address.toIntOrNull() ?: 0
-                val quantity = state.value.quantity.toIntOrNull() ?: 1
+                val slave = current.connectionState.slaveAddress.toIntOrNull()?.coerceIn(1..247) ?: 1
+                val address = current.address.toIntOrNull() ?: 0
+                val quantity = current.quantity.toIntOrNull() ?: 1
 
                 val request = generateRequestUseCase.execute(slave, functionCode, address, quantity)
-                val config = state.value.connectionState.toPortConfig()
+                val config = current.connectionState.toPortConfig()
 
                 val result = sendRawRequestUseCase(request.joinToString(" ") { "%02X".format(it) }, config)
 
-                result.onSuccess { pair ->
-                    val (req, resp) = pair
-                    state.value = state.value.copy(
-                        lastRequestHex = req.joinToString(" ") { "%02X".format(it) },
-                        response = resp.joinToString(" ") { "%02X".format(it) },
-                        error = null
-                    )
+                result.onSuccess { (req, resp) ->
+                    updateState {
+                        it.copy(
+                            lastRequestHex = req.joinToString(" ") { b -> "%02X".format(b) },
+                            response = resp.joinToString(" ") { b -> "%02X".format(b) },
+                            error = null
+                        )
+                    }
                     NotificationManager.show("Запрос успешно отправлен")
-                }.onFailure {
-                    state.value = state.value.copy(error = "Ошибка: ${it.message}")
-                    NotificationManager.show("Ошибка: ${it.message}")
+                }.onFailure { throwable ->
+                    updateState { it.copy(error = "Ошибка: ${throwable.message}") }
+                    NotificationManager.show("Ошибка: ${throwable.message}")
                 }
             } catch (e: Exception) {
-                state.value = state.value.copy(error = "Ошибка: ${e.message}")
+                updateState { it.copy(error = "Ошибка: ${e.message}") }
                 NotificationManager.show("Ошибка: ${e.message}")
             } finally {
                 isRequestInProgress = false
@@ -101,32 +144,38 @@ class RequestViewModel(
     fun sendRawRequest() {
         scope.launch {
             try {
-                val config = state.value.connectionState.toPortConfig()
-                val raw = state.value.rawRequest
+                val config = current.connectionState.toPortConfig()
+                val raw = current.rawRequest
 
                 val result = sendRawRequestUseCase(raw, config)
 
-                result.onSuccess { pair ->
-                    val (req, resp) = pair
-                    state.value = state.value.copy(
-                        lastRequestHex = req.joinToString(" ") { "%02X".format(it) },
-                        response = resp.joinToString(" ") { "%02X".format(it) },
-                        error = null
-                    )
-                }.onFailure {
-                    state.value = state.value.copy(error = "Ошибка: ${it.message}")
+                result.onSuccess { (req, resp) ->
+                    updateState {
+                        it.copy(
+                            lastRequestHex = req.joinToString(" ") { b -> "%02X".format(b) },
+                            response = resp.joinToString(" ") { b -> "%02X".format(b) },
+                            error = null
+                        )
+                    }
+                    NotificationManager.show("Запрос успешно отправлен")
+                }.onFailure { throwable ->
+                    updateState { it.copy(error = "Ошибка: ${throwable.message}") }
+                    NotificationManager.show("Ошибка: ${throwable.message}")
                 }
             } catch (e: Exception) {
-                state.value = state.value.copy(error = "Ошибка: ${e.message}")
+                updateState { it.copy(error = "Ошибка: ${e.message}") }
+                NotificationManager.show("Ошибка: ${e.message}")
+            } finally {
+                isRequestInProgress = false
             }
         }
     }
 
     fun getFormattedResponse(): String {
         return formatResponseUseCase.execute(
-            response = state.value.response,
-            displayMode = state.value.displayMode,
-            byteOrder = state.value.byteOrder
+            response = current.response,
+            displayMode = current.displayMode,
+            byteOrder = current.byteOrder
         )
     }
 } 
