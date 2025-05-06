@@ -11,5 +11,6 @@ data class RequestState(
     val error: String? = null,
     var displayMode: DisplayMode = DisplayMode.HEX,
     val isRequestInProgress: Boolean = false,
-    val byteOrder: ByteOrder = ByteOrder.ABCD
+    val byteOrder: ByteOrder = ByteOrder.ABCD,
+    val isAutoRequestRunning: Boolean = false
 )

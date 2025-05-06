@@ -12,6 +12,8 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -198,14 +200,7 @@ class RequestScreen() : Screen {
                     }
 
                     Button(
-                        onClick = {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                while (true) {
-                                    viewModel.sendGeneratedRequest()
-                                    sleep(10)
-                                }
-                            }
-                        },
+                        onClick = { viewModel.toggleAutoRequest() },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -217,13 +212,13 @@ class RequestScreen() : Screen {
                         )
                     ) {
                         Icon(
-                            Icons.Default.Send,
+                            if (state.isAutoRequestRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Старт ",
+                            if (state.isAutoRequestRunning) "Стоп" else "Старт",
                             modifier = Modifier.padding(vertical = 4.dp),
                             style = MaterialTheme.typography.button.copy(
                                 fontWeight = FontWeight.Bold

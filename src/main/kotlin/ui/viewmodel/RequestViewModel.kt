@@ -18,6 +18,8 @@ import state.DisplayMode
 import state.RequestState
 import ui.components.NotificationManager
 import kotlin.onFailure
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 
 
 class RequestViewModel(
@@ -32,6 +34,7 @@ class RequestViewModel(
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private var isRequestInProgress = false
+    private var autoRequestJob: Job? = null
 
     init {
         loadPorts()
@@ -92,9 +95,35 @@ class RequestViewModel(
         loadPorts()
     }
 
+    fun toggleAutoRequest() {
+        if (current.isAutoRequestRunning) {
+            stopAutoRequest()
+        } else {
+            startAutoRequest()
+        }
+    }
+
+    private fun startAutoRequest() {
+        updateState { it.copy(isAutoRequestRunning = true) }
+        NotificationManager.show("Автоматические запросы запущены")
+        
+        autoRequestJob = scope.launch {
+            while (current.isAutoRequestRunning) {
+                sendGeneratedRequest()
+                delay(10)
+            }
+        }
+    }
+
+    private fun stopAutoRequest() {
+        updateState { it.copy(isAutoRequestRunning = false) }
+        autoRequestJob?.cancel()
+        autoRequestJob = null
+        NotificationManager.show("Автоматические запросы остановлены")
+    }
+
     fun sendGeneratedRequest() {
         if (isRequestInProgress) {
-            NotificationManager.show("Дождитесь завершения предыдущего запроса")
             return
         }
 
@@ -127,7 +156,6 @@ class RequestViewModel(
                             error = null
                         )
                     }
-                    NotificationManager.show("Запрос успешно отправлен")
                 }.onFailure { throwable ->
                     updateState { it.copy(error = "Ошибка: ${throwable.message}") }
                     NotificationManager.show("Ошибка: ${throwable.message}")
