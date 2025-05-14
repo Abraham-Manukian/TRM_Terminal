@@ -1,115 +1,131 @@
+// src/main/kotlin/ui/viewmodel/SelectRegistersViewModel.kt
 package ui.viewmodel
 
+import cafe.adriel.voyager.core.model.ScreenModel
 import domain.model.Register
+import domain.model.RegisterType
+import domain.polling.PollingService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import state.FilterRange
 import state.RegisterSelectionUiState
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
 
-/**
- * ViewModel для экрана выбора регистров
- */
-class SelectRegistersViewModel {
-    // Внутренний mutableStateOf для состояния UI
-    private val _uiState = mutableStateOf(RegisterSelectionUiState())
-    
-    // Публичное свойство для наблюдения состояния UI
-    val uiState: RegisterSelectionUiState by _uiState
-    
-    // Список всех доступных регистров (для обратной совместимости)
-    val availableRegisters: List<Register> get() = uiState.allRegisters
-    
+class SelectRegistersViewModel(
+    private val pollingService: PollingService
+) : ScreenModel {
+    private val _uiState = MutableStateFlow(RegisterSelectionUiState(isLoading = true))
+    val uiState: StateFlow<RegisterSelectionUiState> = _uiState
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val pollingJobs = mutableMapOf<Int, Job>()
+
     init {
-        // Инициализация списка регистров
         loadRegisters()
     }
-    
+
     /**
-     * Загрузка списка доступных регистров
+     * Инициализация списка регистров:
+     *  – адреса 6–11 (дискретные/аналоговые),
+     *  – адреса 57–87 (настройки, они же CONFIG, readOnly = false).
      */
     private fun loadRegisters() {
-        // Пример регистров для демонстрации
-        val sampleRegisters = listOf(
-            Register(6, "Регистр статуса", "Состояние устройства"),
-            Register(7, "Регистр управления", "Управление устройством"),
-            Register(8, "Температура", "Текущая температура"),
-            Register(9, "Давление", "Текущее давление"),
-            Register(10, "Влажность", "Текущая влажность"),
-            Register(11, "Скорость", "Текущая скорость"),
-            Register(57, "Настройка 1", "Параметр настройки 1"),
-            Register(58, "Настройка 2", "Параметр настройки 2"),
-            Register(59, "Настройка 3", "Параметр настройки 3"),
-            Register(85, "Статус ошибки", "Код ошибки"),
-            Register(86, "Режим работы", "Текущий режим"),
-            Register(87, "Конфигурация", "Параметр конфигурации")
+        // 6–11: первые шесть
+        val regs6to11 = listOf(
+            Register(6,  "Регистр статуса",    "Состояние устройства",    RegisterType.DISCRETE),
+            Register(7,  "Регистр управления", "Управление устройством",  RegisterType.DISCRETE),
+            Register(8,  "Температура",        "Текущая температура",     RegisterType.ANALOG),
+            Register(9,  "Давление",           "Текущее давление",        RegisterType.ANALOG),
+            Register(10, "Влажность",          "Текущая влажность",       RegisterType.ANALOG),
+            Register(11, "Скорость",           "Текущая скорость",        RegisterType.ANALOG)
         )
-        
-        updateState(
-            _uiState.value.copy(
-                allRegisters = sampleRegisters,
-                isLoading = false
+
+        // 57–87: конфигурационные параметры
+        val regs57to87 = (57..87).map { addr ->
+            Register(
+                address     = addr,
+                name        = "Настройка $addr",
+                description = "Параметр настройки $addr",
+                type        = RegisterType.CONFIG,
+                readOnly    = false
             )
-        )
+        }
+
+        _uiState.update {
+            it.copy(
+                allRegisters      = regs6to11 + regs57to87,
+                isLoading         = false
+            )
+        }
     }
-    
+
+    /** Обновить поисковый запрос. */
+    fun updateSearchQuery(query: String) =
+        _uiState.update { it.copy(searchQuery = query) }
+
+    /** Обновить диапазон фильтра. */
+    fun updateFilterRange(range: FilterRange) =
+        _uiState.update { it.copy(filterRange = range) }
+
+    /** Показать/скрыть диалог фильтра. */
+    fun toggleFilterDialog(show: Boolean) =
+        _uiState.update { it.copy(showFilterDialog = show) }
+
+    /** Выбрать все отфильтрованные регистры. */
+    fun selectAll() =
+        _uiState.update { st ->
+            st.copy(selectedRegisterIds = st.filteredRegisters.map { it.address }.toSet())
+        }
+
+    /** Сбросить выбор регистров. */
+    fun clearSelection() =
+        _uiState.update { it.copy(selectedRegisterIds = emptySet()) }
+
     /**
-     * Переключение выбора регистра
+     * Переключить выбор одного регистра:
+     * – добавить/удалить его адрес в selectedRegisterIds,
+     * – запустить/остановить real-time опрос через PollingService.
      */
     fun toggleRegisterSelection(register: Register) {
-        val selectedIds = _uiState.value.selectedRegisterIds.toMutableSet()
-        
-        if (selectedIds.contains(register.address)) {
-            selectedIds.remove(register.address)
-        } else {
-            selectedIds.add(register.address)
+        val addr = register.address
+        val newSet = _uiState.value.selectedRegisterIds.toMutableSet().apply {
+            if (contains(addr)) remove(addr) else add(addr)
         }
-        
-        updateState(_uiState.value.copy(selectedRegisterIds = selectedIds))
+        _uiState.update { it.copy(selectedRegisterIds = newSet) }
+
+        if (addr in newSet) {
+            // Запускаем цикличный опрос одного поля
+            val job = scope.launch {
+                pollingService.startFieldPolling(addr) { value ->
+                    _uiState.update { st ->
+                        st.copy(currentValues = st.currentValues + (addr to value))
+                    }
+                }
+            }
+            pollingJobs[addr] = job
+        } else {
+            // Останавливаем опрос
+            pollingJobs.remove(addr)?.cancel()
+        }
     }
-    
-    /**
-     * Сохранение выбранных регистров
-     */
+
+    /** Сохранить выбранные регистры (ваша логика). */
     fun saveSelectedRegisters() {
-        // Здесь будет логика сохранения выбранных регистров
-        // Например, сохранение в базу данных или в настройки
-        
-        // Для демонстрации просто выводим сообщение
+        // TODO: сохраняем выбор куда надо (БД, SharedPreferences и т.д.)
         println("Сохранено ${_uiState.value.selectedCount} регистров")
     }
-    
+
     /**
-     * Обновление поискового запроса
+     * Записать новое значение в регистр по адресу.
      */
-    fun updateSearchQuery(query: String) {
-        updateState(_uiState.value.copy(searchQuery = query))
+    fun writeRegister(register: Register, newValue: Double) {
+        scope.launch {
+            pollingService.writeRegister(register.address, newValue)
+        }
     }
-    
-    /**
-     * Обновление фильтра диапазона
-     */
-    fun updateFilterRange(range: FilterRange) {
-        updateState(_uiState.value.copy(filterRange = range))
-    }
-    
-    /**
-     * Переключение показа диалога фильтра
-     */
-    fun toggleFilterDialog(show: Boolean) {
-        updateState(_uiState.value.copy(showFilterDialog = show))
-    }
-    
-    /**
-     * Проверка выбран ли регистр (для обратной совместимости)
-     */
-    fun isSelected(register: Register): Boolean {
-        return _uiState.value.isSelected(register)
-    }
-    
-    /**
-     * Обновление внутреннего состояния
-     */
-    private fun updateState(newState: RegisterSelectionUiState) {
-        _uiState.value = newState
-    }
-} 
+}

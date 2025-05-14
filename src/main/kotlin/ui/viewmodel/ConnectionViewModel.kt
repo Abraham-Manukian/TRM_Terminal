@@ -90,19 +90,20 @@ class ConnectionViewModel(
             state.copy(stopBits = stopBits)
         }
     }
+    fun setParity(parity: String)         = updateState { it.copy(parity = parity) }
+    fun setAttemptCount(attemptCount: String)   = updateState { it.copy(attemptCount = attemptCount) }
+    fun setTimeoutRead(timeoutRead: String)    = updateState { it.copy(timeoutRead = timeoutRead) }
+    fun setTimeoutWrite(timeoutWrite: String)   = updateState { it.copy(timeoutWrite = timeoutWrite) }
 
     fun saveConnectionSettings() {
         viewModelScope.launch {
             try {
-                saveConnectionSettingsUseCase.execute(currentState.slaveAddress)
-                
-                updateState { state ->
-                    state.copy(error = null)
-                }
+                // вместо старого saveConnectionSettingsUseCase(slaveAddress)
+                val cfg = currentState.toPortConfig()
+                saveConnectionSettingsUseCase.invoke(cfg)
+                updateState { it.copy(error = null) }
             } catch (e: Exception) {
-                updateState { state ->
-                    state.copy(error = "Ошибка сохранения настроек: ${e.message}")
-                }
+                updateState { it.copy(error = "Ошибка сохранения: ${e.message}") }
             }
         }
     }

@@ -9,10 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,10 +21,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
-import ui.viewmodel.SelectRegistersViewModel
 import kotlinx.coroutines.launch
-import state.FilterRange
+import ui.viewmodel.SelectRegistersViewModel
 import domain.model.Register
+import state.FilterRange
+import state.RegisterSelectionUiState
 
 class SelectRegistersScreen(
     private val viewModel: SelectRegistersViewModel
@@ -39,13 +37,14 @@ class SelectRegistersScreen(
         val colors = MaterialTheme.colors
         val scaffoldState = rememberScaffoldState()
         val scope = rememberCoroutineScope()
-        
-        // Получаем состояние UI
-        val state = viewModel.uiState
-        
+
+        // Подписываемся на состояние из VM
+        val state by viewModel.uiState.collectAsState()
+
         Scaffold(
             scaffoldState = scaffoldState,
             topBar = {
+                // ───────────── AppBar ─────────────
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     elevation = 4.dp,
@@ -74,9 +73,9 @@ class SelectRegistersScreen(
                                     tint = colors.onPrimary
                                 )
                             }
-                            
+
                             Spacer(modifier = Modifier.width(16.dp))
-                            
+
                             Text(
                                 "Выбор регистров",
                                 style = MaterialTheme.typography.h6.copy(
@@ -84,9 +83,9 @@ class SelectRegistersScreen(
                                 ),
                                 color = colors.onPrimary
                             )
-                            
+
                             Spacer(modifier = Modifier.weight(1f))
-                            
+
                             IconButton(
                                 onClick = { viewModel.toggleFilterDialog(true) },
                                 modifier = Modifier
@@ -103,8 +102,7 @@ class SelectRegistersScreen(
                                 )
                             }
                         }
-                        
-                        // Строка поиска
+                        // ───────────── Search ─────────────
                         OutlinedTextField(
                             value = state.searchQuery,
                             onValueChange = { viewModel.updateSearchQuery(it) },
@@ -113,12 +111,12 @@ class SelectRegistersScreen(
                                 .padding(horizontal = 16.dp)
                                 .clip(RoundedCornerShape(8.dp)),
                             placeholder = { Text("Поиск по имени или адресу") },
-                            leadingIcon = { 
+                            leadingIcon = {
                                 Icon(
                                     Icons.Default.Search,
                                     contentDescription = "Поиск",
                                     tint = colors.onPrimary.copy(alpha = 0.7f)
-                                ) 
+                                )
                             },
                             colors = TextFieldDefaults.outlinedTextFieldColors(
                                 textColor = colors.onPrimary,
@@ -146,6 +144,7 @@ class SelectRegistersScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // ───────────── Filter Info & Count ─────────────
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     elevation = 2.dp,
@@ -168,16 +167,15 @@ class SelectRegistersScreen(
                                 ),
                                 color = colors.primary
                             )
-                            
                             Text(
                                 "Найдено: ${state.filteredRegisters.size}",
                                 style = MaterialTheme.typography.caption,
                                 color = colors.onSurface.copy(alpha = 0.7f)
                             )
                         }
-                        
                         Divider(color = colors.onSurface.copy(alpha = 0.1f))
-                        
+
+                        // ───────────── Register List ─────────────
                         if (state.filteredRegisters.isEmpty()) {
                             Box(
                                 modifier = Modifier
@@ -197,63 +195,18 @@ class SelectRegistersScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 items(state.filteredRegisters) { register ->
-                                    Card(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                viewModel.toggleRegisterSelection(register)
-                                            },
-                                        elevation = 1.dp,
-                                        shape = RoundedCornerShape(8.dp),
-                                        backgroundColor = if (state.isSelected(register)) 
-                                            colors.primary.copy(alpha = 0.1f) 
-                                        else 
-                                            colors.surface
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(12.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Column(
-                                                modifier = Modifier.weight(1f)
-                                            ) {
-                                                Text(
-                                                    register.name,
-                                                    style = MaterialTheme.typography.subtitle2.copy(
-                                                        fontWeight = if (state.isSelected(register)) 
-                                                            FontWeight.Bold 
-                                                        else 
-                                                            FontWeight.Normal
-                                                    ),
-                                                    color = colors.onSurface
-                                                )
-                                                
-                                                Text(
-                                                    "Адрес: ${register.address}",
-                                                    style = MaterialTheme.typography.caption,
-                                                    color = colors.onSurface.copy(alpha = 0.7f)
-                                                )
-                                            }
-                                            
-                                            Checkbox(
-                                                checked = state.isSelected(register),
-                                                onCheckedChange = { 
-                                                    viewModel.toggleRegisterSelection(register) 
-                                                },
-                                                colors = CheckboxDefaults.colors(
-                                                    checkedColor = colors.primary,
-                                                    uncheckedColor = colors.onSurface.copy(alpha = 0.6f)
-                                                )
-                                            )
-                                        }
-                                    }
+                                    RegisterItem(
+                                        register = register,
+                                        isSelected = state.isSelected(register),
+                                        value = state.currentValues[register.address]?.toString()
+                                            ?: "—",
+                                        onToggle = { viewModel.toggleRegisterSelection(register) }
+                                    )
                                 }
                             }
                         }
-                        
+
+                        // ───────────── Save & Close ─────────────
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -264,16 +217,14 @@ class SelectRegistersScreen(
                                     scope.launch {
                                         scaffoldState.snackbarHostState.showSnackbar(
                                             message = "Регистры сохранены",
-                                            actionLabel = "ОК"
+                                            actionLabel = "OK"
                                         )
                                     }
                                     navigator?.pop()
                                 },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    backgroundColor = colors.primary
-                                ),
+                                colors = ButtonDefaults.buttonColors(backgroundColor = colors.primary),
                                 elevation = ButtonDefaults.elevation(
                                     defaultElevation = 4.dp,
                                     pressedElevation = 8.dp
@@ -298,19 +249,19 @@ class SelectRegistersScreen(
                 }
             }
         }
-        
-        // Диалог выбора фильтра
+
+        // ───────────── Filter Dialog ─────────────
         if (state.showFilterDialog) {
             AlertDialog(
                 onDismissRequest = { viewModel.toggleFilterDialog(false) },
                 title = { Text("Выберите диапазон регистров") },
                 text = {
                     Column {
-                        for (range in FilterRange.values()) {
+                        FilterRange.values().forEach { range ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { 
+                                    .clickable {
                                         viewModel.updateFilterRange(range)
                                         viewModel.toggleFilterDialog(false)
                                     }
@@ -319,7 +270,7 @@ class SelectRegistersScreen(
                             ) {
                                 RadioButton(
                                     selected = state.filterRange == range,
-                                    onClick = { 
+                                    onClick = {
                                         viewModel.updateFilterRange(range)
                                         viewModel.toggleFilterDialog(false)
                                     },
@@ -328,10 +279,7 @@ class SelectRegistersScreen(
                                     )
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = range.label,
-                                    style = MaterialTheme.typography.body1
-                                )
+                                Text(range.label, style = MaterialTheme.typography.body1)
                             }
                         }
                     }
@@ -339,15 +287,62 @@ class SelectRegistersScreen(
                 confirmButton = {
                     Button(
                         onClick = { viewModel.toggleFilterDialog(false) },
-                        colors = ButtonDefaults.buttonColors(
-                            backgroundColor = colors.primary
-                        )
+                        colors = ButtonDefaults.buttonColors(backgroundColor = colors.primary)
                     ) {
                         Text("Закрыть")
                     }
                 },
                 backgroundColor = colors.surface,
                 shape = RoundedCornerShape(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RegisterItem(
+    register: Register,
+    isSelected: Boolean,
+    value: String,
+    onToggle: () -> Unit
+) {
+    val colors = MaterialTheme.colors
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle),
+        elevation = 1.dp,
+        shape = RoundedCornerShape(8.dp),
+        backgroundColor = if (isSelected) colors.primary.copy(alpha = 0.1f) else colors.surface
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    register.name,
+                    style = MaterialTheme.typography.subtitle2.copy(
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                    ),
+                    color = colors.onSurface
+                )
+                Text(
+                    "Адрес: ${register.address}    Val: $value",
+                    style = MaterialTheme.typography.caption,
+                    color = colors.onSurface.copy(alpha = 0.7f)
+                )
+            }
+            Checkbox(
+                checked = isSelected,
+                onCheckedChange = { onToggle() },
+                colors = CheckboxDefaults.colors(
+                    checkedColor = colors.primary,
+                    uncheckedColor = colors.onSurface.copy(alpha = 0.6f)
+                )
             )
         }
     }

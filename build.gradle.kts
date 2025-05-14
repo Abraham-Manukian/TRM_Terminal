@@ -11,6 +11,9 @@ repositories {
     google()
     mavenCentral()
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+    flatDir {
+        dirs("libs")
+    }
 }
 val voyager_vresion = "1.0.1"
 
@@ -47,6 +50,9 @@ dependencies {
 
     // Koin для Compose Desktop
     implementation("io.insert-koin:koin-compose:4.0.4")
+
+    //Для запросов и ответов Modbus
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
 
     testImplementation(kotlin("test"))
 }

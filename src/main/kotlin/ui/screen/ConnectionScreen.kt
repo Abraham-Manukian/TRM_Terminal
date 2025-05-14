@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -28,7 +30,7 @@ import ui.components.NotificationPopup
 import ui.viewmodel.ConnectionViewModel
 
 class ConnectionScreen(
-    private val viewModel: ConnectionViewModel
+    private val viewModel: ConnectionViewModel,
 ) : Screen {
 
     @Composable
@@ -236,6 +238,36 @@ class ConnectionScreen(
                         colors = tfColors,
                         shape = RoundedCornerShape(8.dp)
                     )
+
+                    DropdownMenuField(
+                        label    = "Parity",
+                        selected = state.parity,
+                        options  = listOf("NONE", "EVEN", "ODD")
+                    ) { viewModel.setParity(it) }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        OutlinedTextField(
+                            value       = state.attemptCount,
+                            onValueChange = viewModel::setAttemptCount,
+                            label       = { Text("Attempt Count") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine  = true
+                        )
+                        OutlinedTextField(
+                            value       = state.timeoutRead,
+                            onValueChange = viewModel::setTimeoutRead,
+                            label       = { Text("Timeout Read") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine  = true
+                        )
+                        OutlinedTextField(
+                            value       = state.timeoutWrite,
+                            onValueChange = viewModel::setTimeoutWrite,
+                            label       = { Text("Timeout Write") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine  = true
+                        )
+                    }
                 }
             }
             

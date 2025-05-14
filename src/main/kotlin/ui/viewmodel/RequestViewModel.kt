@@ -3,6 +3,7 @@ package ui.viewmodel
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.screen.Screen
+import domain.model.PortConfig
 import domain.usecase.FormatResponseUseCase
 import domain.usecase.GenerateRequestUseCase
 import domain.usecase.LoadPortsUseCase
@@ -20,13 +21,18 @@ import ui.components.NotificationManager
 import kotlin.onFailure
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 
 
 class RequestViewModel(
     private val sendRawRequestUseCase: SendRawRequestUseCase,
     private val generateRequestUseCase: GenerateRequestUseCase,
     private val formatResponseUseCase: FormatResponseUseCase,
-    private val loadPortsUseCase: LoadPortsUseCase
+    private val loadPortsUseCase: LoadPortsUseCase,
+//    private val readUseCase: ReadHoldingUseCase,
+    private val connectionVM: ConnectionViewModel
 ) : ScreenModel {
 
     private val _state = MutableStateFlow(RequestState())
@@ -35,9 +41,14 @@ class RequestViewModel(
     private val scope = CoroutineScope(Dispatchers.IO)
     private var isRequestInProgress = false
     private var autoRequestJob: Job? = null
+    private var cfg: PortConfig? = null
 
     init {
         loadPorts()
+        connectionVM.state
+                     .map { it.toPortConfig() }
+                     .onEach { cfg = it }
+                     .launchIn(scope)
     }
 
     private val current get() = _state.value
