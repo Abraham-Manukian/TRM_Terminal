@@ -20,7 +20,16 @@ val voyager_vresion = "1.0.1"
 dependencies {
     implementation(compose.desktop.currentOs)
 
-    implementation("com.fazecast:jSerialComm:2.10.4") // для работы с COM-портами
+    implementation("ch.qos.logback:logback-classic:1.4.6")
+    implementation("ch.qos.logback:logback-core:1.4.6")
+    implementation("io.github.microutils:kotlin-logging-jvm:3.0.2")
+    implementation("io.github.microutils:kotlin-logging:1.8.3")
+    implementation("org.slf4j:slf4j-api:1.7.25")
+    implementation("org.apache.logging.log4j:log4j-slf4j-impl:2.9.1")
+    implementation("org.apache.logging.log4j:log4j-api:2.9.1")
+    implementation("org.apache.logging.log4j:log4j-core:2.9.1")
+    implementation("com.fazecast:jSerialComm:2.9.2")
+//    implementation("org.slf4j:slf4j-simple:2.0.9")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
     implementation("com.darkrockstudios:mpfilepicker:1.0.0")
@@ -50,6 +59,10 @@ dependencies {
 
     // Koin для Compose Desktop
     implementation("io.insert-koin:koin-compose:4.0.4")
+
+    // для kserialpooler:
+    implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
+    // простой SLF4J‐бэкенд (чтобы логи не падали из‐за отсутствия binding)
 
     //Для запросов и ответов Modbus
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))

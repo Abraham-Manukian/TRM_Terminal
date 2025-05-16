@@ -1,5 +1,6 @@
 package org.example
 
+import org.example.data.DevicePoller
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -19,6 +20,7 @@ fun main() = application {
         val themeState = viewModel.state.collectAsState()
         AppTheme(isDark = themeState.value.isDarkTheme) {
             Window(onCloseRequest = ::exitApplication, title = "TRM1 Terminal") {
+                DevicePoller
                 Navigator(screen = MainMenuScreen())
             }
         }

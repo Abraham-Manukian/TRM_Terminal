@@ -1,15 +1,18 @@
 package data.polling
 
-import data.adapter.ModbusAdapter
+import org.example.data.DevicePoller.checkResponsibilityAndNotify
+import org.example.data.DevicePoller.connection
+import org.example.data.DevicePoller.devs
 import domain.model.PortConfig
-import domain.polling.PollingService
 import data.device.Avem4Controller
+import domain.model.RegisterType
 import kotlinx.coroutines.*
+import org.example.data.DevicePoller
+import org.example.domain.repository.PollingService
 import ru.avem.kserialpooler.Connection
-import ru.avem.kserialpooler.adapters.modbusrtu.ModbusRTUAdapter
 import ru.avem.kserialpooler.utils.SerialParameters
+import ru.avem.library.polling.DeviceRegister
 import java.util.concurrent.ConcurrentHashMap
-
 
 /**
  * Менеджер фонового опроса и одиночных полей.
@@ -26,9 +29,8 @@ class PollingManager(
         stopAll()
         currentConfig = config
 
-        // 1) Открываем порт
-        val connection = Connection(
-            adapterName = config.portName,
+        connection = Connection(
+            adapterName      = config.portName,
             serialParameters = SerialParameters(
                 config.dataBits,
                 config.parity,
@@ -36,25 +38,27 @@ class PollingManager(
                 config.baudRate
             ),
             attemptCount = config.attemptCount,
-            timeoutRead = config.timeoutRead,
+            timeoutRead  = config.timeoutRead,
             timeoutWrite = config.timeoutWrite
         ).apply { connect() }
 
-        // 2) Создаём RTU-адаптер из kserialpooler
-        val rtuAdapter = ModbusRTUAdapter(connection)
-
-        // 3) Передаём его в контроллер — вот здесь была ваша ошибка
         controller = Avem4Controller(
             name            = "АВЭМ4${config.slaveId}",
-            protocolAdapter = rtuAdapter,        // теперь правильный тип!
+            protocolAdapter = DevicePoller.main,
             id              = config.slaveId
         )
 
-        // 4) Стартуем фоновый цикл опроса всех регистров
+        controller.addTo(devs)
+        with(controller) {
+            // пример использований из utility:
+            // DevicePoller.startPoll(controller.name, model.FREQUENCY_TM) { println(it) }
+        }
         job = CoroutineScope(ioDispatcher).launch {
             while (isActive) {
-                controller.readAllRegisters()
-                delay(config.pollIntervalMillis)
+                with(controller) {
+                    readAllRegisters()
+                    println(controller.getRegisterById(controller.model.FREQUENCY).value)
+                }
             }
         }
     }
@@ -63,7 +67,6 @@ class PollingManager(
         job?.cancel()
         fieldJobs.values.forEach { it.cancel() }
         try {
-            // Корректно разрываем соединение
             controller.protocolAdapter.connection.disconnect()
         } catch (_: Exception) {}
     }
@@ -72,13 +75,12 @@ class PollingManager(
         registerAddress: Int,
         onValue: (Double) -> Unit
     ) {
-        // Отменяем прошлый таск, если есть
+        if (!::controller.isInitialized) {
+            startPolling(currentConfig)
+        }
         fieldJobs[registerAddress]?.cancel()
-
-        // Новый цикл
         val job = CoroutineScope(ioDispatcher).launch {
             while (isActive) {
-                // Ищем нужный регистр в модели по адресу
                 val reg = controller.model.registers
                     .values
                     .first { it.address.toInt() == registerAddress }
@@ -91,10 +93,35 @@ class PollingManager(
     }
 
     override fun writeRegister(registerAddress: Int, value: Number) {
-        // Находим регистр и вызываем контроллер
         val reg = controller.model.registers
             .values
             .first { it.address.toInt() == registerAddress }
         controller.writeRegister(reg, value)
     }
+
+    override fun getRegisters(): List<domain.model.Register> {
+        return controller.model.registers.entries.map { (idKey, devReg) ->
+            // Определяем, в какой domain.RegisterType переводить
+            val regType = when (devReg.valueType) {
+                DeviceRegister.RegisterValueType.SHORT       -> RegisterType.DISCRETE
+                DeviceRegister.RegisterValueType.FLOAT,
+                DeviceRegister.RegisterValueType.INT32       -> RegisterType.ANALOG
+                else                                         -> RegisterType.CONFIG
+            }
+            // Собираем domain.model.Register, имя берём из ключа мапы
+            domain.model.Register(
+                address     = devReg.address.toInt(),
+                name        = idKey,
+                description = "",
+                type        = regType
+            // readOnly оставляем по умолчанию = true
+            )
+        }
+    }
+}
+
+fun <C : S, S> C.addTo(list: MutableSet<S>): C {
+    list.add(this)
+    DevicePoller.deviceControllers = DevicePoller.devs.associateBy { it.name }
+    return this
 }

@@ -1,7 +1,7 @@
 package data.polling
 
 import androidx.compose.runtime.MutableState
-import domain.polling.PollingService
+import org.example.domain.repository.PollingService
 
 /**
  * DSL для «поля», которое опрашивается в реальном времени.

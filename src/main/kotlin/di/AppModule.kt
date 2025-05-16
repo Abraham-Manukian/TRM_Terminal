@@ -1,11 +1,7 @@
 package di
 
-import data.datasource.ModbusDataSourceImpl
-import data.repository.ModbusRepositoryImpl
-import data.repository.SerialPortRepositoryImpl
+
 import data.NotificationServiceImpl
-import data.adapter.ModbusAdapter
-import domain.repository.ModbusRepository
 import domain.repository.SerialPortRepository
 import domain.service.NotificationService
 import domain.usecase.*
@@ -14,29 +10,21 @@ import ui.viewmodel.ConnectionViewModel
 import ui.viewmodel.MainMenuViewModel
 import ui.viewmodel.RequestViewModel
 import ui.viewmodel.SelectRegistersViewModel
-import data.datasource.ModbusDataSource
 
 import data.polling.PollingManager
-import domain.model.PortConfig
-import domain.polling.PollingService
+import data.repository.SerialPortRepositoryImpl
+import org.example.domain.repository.PollingService
 
 val appModule = module {
-    // Data sources
-    single<ModbusDataSource> { ModbusDataSourceImpl() }
-    
-    // Repositories
-    single<ModbusRepository> { ModbusRepositoryImpl(get()) }
-    single<SerialPortRepository> { SerialPortRepositoryImpl() }
-
-    // Connection config
-    factory { (cfg: PortConfig) -> ModbusAdapter(cfg) }
-
 
     // Polling-сервис
     single<PollingService> { PollingManager() }
     single { StartPollingUseCase(get()) }
     single { StopPollingUseCase(get()) }
 
+    single<SerialPortRepository> {
+        SerialPortRepositoryImpl()
+    }
     
     // Services
     single<NotificationService> { NotificationServiceImpl() }
@@ -50,7 +38,7 @@ val appModule = module {
     
     // ViewModels
     single { MainMenuViewModel() }
-    single { ConnectionViewModel(get(), get()) }
+    single { ConnectionViewModel(get(), get(), get(), get()) }
     single { RequestViewModel(get(), get(), get(), get(), get()) }
-    single { SelectRegistersViewModel(pollingService = get ()) }
+    single { SelectRegistersViewModel(get(), get (), get()) }
 }

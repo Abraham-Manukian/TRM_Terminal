@@ -1,7 +1,7 @@
 package domain.usecase
 
 import domain.model.PortConfig
-import domain.polling.PollingService
+import org.example.domain.repository.PollingService
 
 class StartPollingUseCase(
     private val pollingService: PollingService

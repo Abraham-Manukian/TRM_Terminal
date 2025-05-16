@@ -1,6 +1,6 @@
 package domain.usecase
 
-import domain.polling.PollingService
+import org.example.domain.repository.PollingService
 
 class StopPollingUseCase(
     private val pollingService: PollingService

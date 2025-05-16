@@ -10,8 +10,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
-import ui.viewmodel.SelectRegistersViewModel
 import domain.model.Register
+import domain.model.RegisterType
+import ui.viewmodel.SelectRegistersViewModel
 
 class PinnedRegistersScreen(
     private val viewModel: SelectRegistersViewModel
@@ -19,7 +20,7 @@ class PinnedRegistersScreen(
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.current
-        val state by viewModel.uiState.collectAsState()
+        val state     by viewModel.uiState.collectAsState()
 
         Scaffold(
             topBar = {
@@ -40,13 +41,20 @@ class PinnedRegistersScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // Для каждого выбранного регистра показываем имя, текущее значение и поле для ввода
                 state.allRegisters
                     .filter { state.isSelected(it) }
                     .forEach { register ->
-                        // локальное состояние ввода
+                        val current = state.currentValues[register.address]
                         var text by remember { mutableStateOf(
-                            state.currentValues[register.address]?.toString() ?: ""
-                        )}
+                            current?.let {
+                                when (register.type) {
+                                    RegisterType.ANALOG -> String.format("%.2f", it)
+                                    else                 -> it.toInt().toString()
+                                }
+                            } ?: ""
+                        ) }
+
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -56,12 +64,12 @@ class PinnedRegistersScreen(
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.body1
                             )
-                            TextField(
+                            OutlinedTextField(
                                 value = text,
-                                onValueChange = { newText ->
-                                    text = newText
-                                    newText.toDoubleOrNull()?.let { newVal ->
-                                        viewModel.writeRegister(register, newVal)
+                                onValueChange = { new ->
+                                    text = new
+                                    new.toDoubleOrNull()?.let { value ->
+                                        viewModel.writeRegister(register, value)
                                     }
                                 },
                                 singleLine = true,

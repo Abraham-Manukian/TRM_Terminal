@@ -2,38 +2,17 @@ package state
 
 import domain.model.Register
 
-/**
- * Состояние UI для экрана выбора регистров,
- * включая хранение актуальных значений по каждому адресу.
- */
 data class RegisterSelectionUiState(
-    // Список всех доступных регистров
     val allRegisters: List<Register> = emptyList(),
-
-    // Набор адресов выбранных (прикреплённых) регистров
     val selectedRegisterIds: Set<Int> = emptySet(),
-
-    // Строка поиска
     val searchQuery: String = "",
-
-    // Выбранный диапазон фильтрации
     val filterRange: FilterRange = FilterRange.ALL,
-
-    // Флаг загрузки списка регистров
     val isLoading: Boolean = false,
-
-    // Сообщение об ошибке
     val errorMessage: String? = null,
-
-    // Флаг показа диалога настроек фильтра
     val showFilterDialog: Boolean = false,
-
-    // **Новое поле**: текущие значения регистров по их адресу
+    val isConnected: Boolean = false,
     val currentValues: Map<Int, Double> = emptyMap()
 ) {
-    /**
-     * Отфильтрованный список регистров по searchQuery и filterRange
-     */
     val filteredRegisters: List<Register>
         get() {
             if (allRegisters.isEmpty()) return emptyList()
@@ -50,15 +29,9 @@ data class RegisterSelectionUiState(
             }
         }
 
-    /**
-     * Проверка, выбран ли регистр
-     */
     fun isSelected(register: Register): Boolean =
         selectedRegisterIds.contains(register.address)
 
-    /**
-     * Количество выбранных регистров
-     */
     val selectedCount: Int
         get() = selectedRegisterIds.size
 }

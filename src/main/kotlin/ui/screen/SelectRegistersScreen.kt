@@ -1,21 +1,15 @@
 package ui.screen
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.*
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -25,7 +19,6 @@ import kotlinx.coroutines.launch
 import ui.viewmodel.SelectRegistersViewModel
 import domain.model.Register
 import state.FilterRange
-import state.RegisterSelectionUiState
 
 class SelectRegistersScreen(
     private val viewModel: SelectRegistersViewModel
@@ -33,316 +26,161 @@ class SelectRegistersScreen(
 
     @Composable
     override fun Content() {
-        val navigator = LocalNavigator.current
-        val colors = MaterialTheme.colors
+        val nav           = LocalNavigator.current
         val scaffoldState = rememberScaffoldState()
-        val scope = rememberCoroutineScope()
-
-        // Подписываемся на состояние из VM
+        val scope         = rememberCoroutineScope()
         val state by viewModel.uiState.collectAsState()
 
         Scaffold(
             scaffoldState = scaffoldState,
             topBar = {
-                // ───────────── AppBar ─────────────
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = 4.dp,
-                    backgroundColor = colors.primary,
-                    shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
-                ) {
-                    Column(modifier = Modifier.padding(bottom = 16.dp)) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = { navigator?.pop() },
-                                modifier = Modifier
-                                    .background(
-                                        color = colors.surface.copy(alpha = 0.2f),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .size(36.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.ArrowBack,
-                                    contentDescription = "Назад",
-                                    tint = colors.onPrimary
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            Text(
-                                "Выбор регистров",
-                                style = MaterialTheme.typography.h6.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = colors.onPrimary
-                            )
-
-                            Spacer(modifier = Modifier.weight(1f))
-
-                            IconButton(
-                                onClick = { viewModel.toggleFilterDialog(true) },
-                                modifier = Modifier
-                                    .background(
-                                        color = colors.surface.copy(alpha = 0.2f),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .size(36.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.FilterList,
-                                    contentDescription = "Фильтр",
-                                    tint = colors.onPrimary
-                                )
-                            }
+                TopAppBar(
+                    title = { Text("Выбор регистров") },
+                    navigationIcon = {
+                        IconButton(onClick = { nav?.pop() }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = null)
                         }
-                        // ───────────── Search ─────────────
-                        OutlinedTextField(
-                            value = state.searchQuery,
-                            onValueChange = { viewModel.updateSearchQuery(it) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            placeholder = { Text("Поиск по имени или адресу") },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Search,
-                                    contentDescription = "Поиск",
-                                    tint = colors.onPrimary.copy(alpha = 0.7f)
-                                )
-                            },
-                            colors = TextFieldDefaults.outlinedTextFieldColors(
-                                textColor = colors.onPrimary,
-                                cursorColor = colors.onPrimary,
-                                leadingIconColor = colors.onPrimary,
-                                focusedBorderColor = colors.onPrimary,
-                                unfocusedBorderColor = colors.onPrimary.copy(alpha = 0.7f),
-                                backgroundColor = colors.primary.copy(alpha = 0.3f),
-                                placeholderColor = colors.onPrimary.copy(alpha = 0.7f)
-                            ),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Text,
-                                imeAction = ImeAction.Search
-                            )
-                        )
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            nav?.push(ConnectionScreen(viewModel.connectionViewModel))
+                        }) {
+                            Icon(Icons.Default.Settings, contentDescription = null)
+                        }
+                        IconButton(onClick = { viewModel.toggleFilterDialog(true) }) {
+                            Icon(Icons.Default.FilterList, contentDescription = null)
+                        }
                     }
-                }
+                )
             }
         ) { padding ->
             Column(
-                modifier = Modifier
+                Modifier
                     .fillMaxSize()
                     .padding(padding)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // ───────────── Filter Info & Count ─────────────
-                Card(
+                OutlinedTextField(
+                    value = state.searchQuery,
+                    onValueChange = viewModel::updateSearchQuery,
                     modifier = Modifier.fillMaxWidth(),
-                    elevation = 2.dp,
-                    shape = RoundedCornerShape(12.dp),
-                    backgroundColor = colors.surface
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    placeholder = { Text("Поиск") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Search
+                    )
+                )
+
+                if (state.isLoading) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                state.filterRange.label,
-                                style = MaterialTheme.typography.subtitle1.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = colors.primary
-                            )
-                            Text(
-                                "Найдено: ${state.filteredRegisters.size}",
-                                style = MaterialTheme.typography.caption,
-                                color = colors.onSurface.copy(alpha = 0.7f)
+                        items(state.filteredRegisters) { reg ->
+                            RegisterRow(
+                                register   = reg,
+                                isSelected = state.isSelected(reg),
+                                rawValue   = state.currentValues[reg.address],
+                                enabled    = state.isConnected,
+                                onToggle   = { viewModel.toggleRegisterSelection(reg) }
                             )
                         }
-                        Divider(color = colors.onSurface.copy(alpha = 0.1f))
+                    }
 
-                        // ───────────── Register List ─────────────
-                        if (state.filteredRegisters.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "Регистры не найдены",
-                                    style = MaterialTheme.typography.body1,
-                                    color = colors.onSurface.copy(alpha = 0.5f)
-                                )
+                    Button(
+                        onClick = {
+                            viewModel.saveSelectedRegisters()
+                            scope.launch {
+                                scaffoldState.snackbarHostState.showSnackbar("Сохранено")
                             }
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(state.filteredRegisters) { register ->
-                                    RegisterItem(
-                                        register = register,
-                                        isSelected = state.isSelected(register),
-                                        value = state.currentValues[register.address]?.toString()
-                                            ?: "—",
-                                        onToggle = { viewModel.toggleRegisterSelection(register) }
-                                    )
-                                }
-                            }
-                        }
-
-                        // ───────────── Save & Close ─────────────
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    viewModel.saveSelectedRegisters()
-                                    scope.launch {
-                                        scaffoldState.snackbarHostState.showSnackbar(
-                                            message = "Регистры сохранены",
-                                            actionLabel = "OK"
-                                        )
-                                    }
-                                    navigator?.pop()
-                                },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(backgroundColor = colors.primary),
-                                elevation = ButtonDefaults.elevation(
-                                    defaultElevation = 4.dp,
-                                    pressedElevation = 8.dp
-                                )
-                            ) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    "Сохранить выбор",
-                                    modifier = Modifier.padding(vertical = 4.dp),
-                                    style = MaterialTheme.typography.button.copy(
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                )
-                            }
-                        }
+                            nav?.pop()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Сохранить выбор")
                     }
                 }
             }
-        }
 
-        // ───────────── Filter Dialog ─────────────
-        if (state.showFilterDialog) {
-            AlertDialog(
-                onDismissRequest = { viewModel.toggleFilterDialog(false) },
-                title = { Text("Выберите диапазон регистров") },
-                text = {
-                    Column {
-                        FilterRange.values().forEach { range ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        viewModel.updateFilterRange(range)
-                                        viewModel.toggleFilterDialog(false)
-                                    }
-                                    .padding(vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = state.filterRange == range,
-                                    onClick = {
-                                        viewModel.updateFilterRange(range)
-                                        viewModel.toggleFilterDialog(false)
-                                    },
-                                    colors = RadioButtonDefaults.colors(
-                                        selectedColor = colors.primary
+            if (state.showFilterDialog) {
+                AlertDialog(
+                    onDismissRequest = { viewModel.toggleFilterDialog(false) },
+                    title = { Text("Выберите диапазон") },
+                    text = {
+                        Column {
+                            FilterRange.values().forEach { range ->
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.updateFilterRange(range)
+                                            viewModel.toggleFilterDialog(false)
+                                        }
+                                        .padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = state.filterRange == range,
+                                        onClick = {
+                                            viewModel.updateFilterRange(range)
+                                            viewModel.toggleFilterDialog(false)
+                                        }
                                     )
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(range.label, style = MaterialTheme.typography.body1)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(range.label)
+                                }
                             }
                         }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { viewModel.toggleFilterDialog(false) }) {
+                            Text("OK")
+                        }
                     }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { viewModel.toggleFilterDialog(false) },
-                        colors = ButtonDefaults.buttonColors(backgroundColor = colors.primary)
-                    ) {
-                        Text("Закрыть")
-                    }
-                },
-                backgroundColor = colors.surface,
-                shape = RoundedCornerShape(16.dp)
-            )
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun RegisterItem(
+private fun RegisterRow(
     register: Register,
     isSelected: Boolean,
-    value: String,
+    rawValue: Double?,
+    enabled: Boolean,
     onToggle: () -> Unit
 ) {
-    val colors = MaterialTheme.colors
+    val display = rawValue?.let { String.format("%.2f", it) } ?: "—"
     Card(
-        modifier = Modifier
+        Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle),
-        elevation = 1.dp,
+            .clickable(enabled, onClick = onToggle),
         shape = RoundedCornerShape(8.dp),
-        backgroundColor = if (isSelected) colors.primary.copy(alpha = 0.1f) else colors.surface
+        elevation = 2.dp
     ) {
         Row(
-            modifier = Modifier
+            Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    register.name,
-                    style = MaterialTheme.typography.subtitle2.copy(
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    ),
-                    color = colors.onSurface
-                )
-                Text(
-                    "Адрес: ${register.address}    Val: $value",
-                    style = MaterialTheme.typography.caption,
-                    color = colors.onSurface.copy(alpha = 0.7f)
-                )
+            Column(Modifier.weight(1f)) {
+                Text(register.name, style = MaterialTheme.typography.subtitle1)
+                Text("Adr: ${register.address}  Val: $display", style = MaterialTheme.typography.caption)
             }
             Checkbox(
                 checked = isSelected,
                 onCheckedChange = { onToggle() },
-                colors = CheckboxDefaults.colors(
-                    checkedColor = colors.primary,
-                    uncheckedColor = colors.onSurface.copy(alpha = 0.6f)
-                )
+                enabled = enabled
             )
         }
     }
