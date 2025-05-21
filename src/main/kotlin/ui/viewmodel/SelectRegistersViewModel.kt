@@ -2,7 +2,6 @@ package ui.viewmodel
 
 import cafe.adriel.voyager.core.model.ScreenModel
 import domain.model.Register
-import domain.model.RegisterType
 import org.example.domain.repository.PollingService
 import domain.usecase.StartPollingUseCase
 import kotlinx.coroutines.*
@@ -36,21 +35,6 @@ class SelectRegistersViewModel(
                 ) }
             }
             .launchIn(scope)
-    }
-
-    private fun loadRegisters() {
-        val base = listOf(
-            Register(6, "Регистр статуса",    "Состояние устройства", RegisterType.DISCRETE),
-            Register(7, "Регистр управления", "Управление устройством", RegisterType.DISCRETE),
-            Register(8, "Температура",        "Текущая температура",   RegisterType.ANALOG),
-            Register(9, "Давление",           "Текущее давление",      RegisterType.ANALOG),
-            Register(10,"Влажность",          "Текущая влажность",     RegisterType.ANALOG),
-            Register(11,"Скорость",           "Текущая скорость",      RegisterType.ANALOG)
-        )
-        val cfgs = (57..87).map { addr ->
-            Register(addr, "Настройка $addr", "Параметр $addr", RegisterType.CONFIG, readOnly = false)
-        }
-        _uiState.update { it.copy(allRegisters = base + cfgs) }
     }
 
     private fun startFieldPolling(address: Int) {

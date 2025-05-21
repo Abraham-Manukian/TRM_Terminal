@@ -1,55 +1,30 @@
 package ui.viewmodel
 
-import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.screen.Screen
 import domain.model.PortConfig
-import domain.usecase.FormatResponseUseCase
-import domain.usecase.GenerateRequestUseCase
-import domain.usecase.LoadPortsUseCase
-import domain.usecase.SendRawRequestUseCase
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import domain.model.Register
+import domain.usecase.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 import state.ByteOrder
 import state.DisplayMode
 import state.RequestState
+import state.toPortConfigOrNull
 import ui.components.NotificationManager
-import kotlin.onFailure
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
-
 
 class RequestViewModel(
-    private val sendRawRequestUseCase: SendRawRequestUseCase,
-    private val generateRequestUseCase: GenerateRequestUseCase,
-    private val formatResponseUseCase: FormatResponseUseCase,
-    private val loadPortsUseCase: LoadPortsUseCase,
-//    private val readUseCase: ReadHoldingUseCase,
-    private val connectionVM: ConnectionViewModel
+    private val updatePortConfig: UpdatePortConfigUseCase,
+    private val startPolling: StartSingleRegisterPollingUseCase,
+    private val stopPolling: StopSingleRegisterPollingUseCase,
+    private val readOnce: ReadRegisterOnceUseCase,
+    private val writeRegister: WriteRegisterUseCase,
+    private val saveConnectionSettings: SaveConnectionSettingsUseCase,
+    private val frequencyRegister: Register,
+    private val connectionViewModel: ConnectionViewModel
 ) : ScreenModel {
 
     private val _state = MutableStateFlow(RequestState())
     val state: StateFlow<RequestState> = _state
-
-    private val scope = CoroutineScope(Dispatchers.IO)
-    private var isRequestInProgress = false
-    private var autoRequestJob: Job? = null
-    private var cfg: PortConfig? = null
-
-    init {
-        loadPorts()
-        connectionVM.state
-                     .map { it.toPortConfig() }
-                     .onEach { cfg = it }
-                     .launchIn(scope)
-    }
 
     private val current get() = _state.value
 
@@ -57,26 +32,66 @@ class RequestViewModel(
         _state.update(update)
     }
 
-    fun loadPorts() {
-        val ports = loadPortsUseCase.execute(current.connectionState.showAllPorts)
-        val firstPort = ports.firstOrNull()?.systemName.orEmpty()
+    init {
+        connectionViewModel.state
+            .map { it.toPortConfig() }
+            .onEach { cfg -> saveConnectionSettings(cfg) }
+            .launchIn(CoroutineScope(Dispatchers.IO))
+    }
 
-        updateState { state ->
-            state.copy(
-                connectionState = state.connectionState.copy(
-                    ports = ports.associateBy { it.systemName },
-                    selectedPort = firstPort
-                )
-            )
+    fun readOnce() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = readOnce(frequencyRegister)
+            result
+                .onSuccess { value ->
+                    updateState { it.copy(response = value.toString(), error = null) }
+                }
+                .onFailure { error ->
+                    updateState { it.copy(error = error.message ?: "Ошибка чтения") }
+                }
         }
     }
 
+    fun toggleAutoRequest() {
+        if (state.value.isAutoRequestRunning) {
+            stopAutoRequest()
+        } else {
+            startAutoRequest()
+        }
+    }
+
+    fun startAutoRequest() {
+        println("State at submit: ${connectionViewModel.state.value}")
+        val config = connectionViewModel.state.value.toPortConfigOrNull()
+        if (config == null) {
+            NotificationManager.show("Сначала настройте подключение")
+            return
+        }
+        updatePortConfig(config)
+
+        updateState { it.copy(isAutoRequestRunning = true) }
+        startPolling(frequencyRegister) { value ->
+            updateState { it.copy(response = value.toString(), error = null) }
+        }
+    }
+
+    fun stopAutoRequest() {
+        updateState { it.copy(isAutoRequestRunning = false) }
+        stopPolling(frequencyRegister)
+        NotificationManager.show("Автоопрос остановлен")
+    }
+
     fun setByteOrder(order: ByteOrder) {
-        _state.update { it.copy(byteOrder = order) }
+        updateState { it.copy(byteOrder = order) }
+    }
+
+    fun setByteOrder(label: String) {
+        val order = ByteOrder.values().find { it.label == label } ?: ByteOrder.ABCD
+        updateState { it.copy(byteOrder = order) }
     }
 
     fun setDisplayMode(mode: DisplayMode) {
-        _state.update { it.copy(displayMode = mode) }
+        updateState { it.copy(displayMode = mode) }
     }
 
     fun getModeDescription(mode: DisplayMode): String {
@@ -87,134 +102,17 @@ class RequestViewModel(
         }
     }
 
-    fun setByteOrder(label: String) {
-        val order = ByteOrder.values().find { it.label == label } ?: ByteOrder.ABCD
-        updateState { it.copy(byteOrder = order) }
-    }
-
     fun setRawRequest(value: String) {
         updateState { it.copy(rawRequest = value) }
     }
 
-    fun toggleShowAllPorts() {
-        updateState { state ->
-            val toggled = state.connectionState.copy(
-                showAllPorts = !state.connectionState.showAllPorts
-            )
-            state.copy(connectionState = toggled)
-        }
-        loadPorts()
-    }
-
-    fun toggleAutoRequest() {
-        if (current.isAutoRequestRunning) {
-            stopAutoRequest()
-        } else {
-            startAutoRequest()
-        }
-    }
-
-    private fun startAutoRequest() {
-        updateState { it.copy(isAutoRequestRunning = true) }
-        NotificationManager.show("Автоматические запросы запущены")
-        
-        autoRequestJob = scope.launch {
-            while (current.isAutoRequestRunning) {
-                sendGeneratedRequest()
-                delay(10)
-            }
-        }
-    }
-
-    private fun stopAutoRequest() {
-        updateState { it.copy(isAutoRequestRunning = false) }
-        autoRequestJob?.cancel()
-        autoRequestJob = null
-        NotificationManager.show("Автоматические запросы остановлены")
-    }
-
-    fun sendGeneratedRequest() {
-        if (isRequestInProgress) {
-            return
-        }
-
-        isRequestInProgress = true
-        updateState { it.copy(error = null) }
-
-        scope.launch {
-            try {
-                val type = current.requestType
-                val functionCode = when (type) {
-                    "Read Holding Registers" -> 0x03
-                    "Write Single Register" -> 0x06
-                    else -> 0x03
-                }
-
-                val slave = current.connectionState.slaveAddress.toIntOrNull()?.coerceIn(1..247) ?: 1
-                val address = current.address.toIntOrNull() ?: 0
-                val quantity = current.quantity.toIntOrNull() ?: 1
-
-                val request = generateRequestUseCase.execute(slave, functionCode, address, quantity)
-                val config = current.connectionState.toPortConfig()
-
-                val result = sendRawRequestUseCase(request.joinToString(" ") { "%02X".format(it) }, config)
-
-                result.onSuccess { (req, resp) ->
-                    updateState {
-                        it.copy(
-                            lastRequestHex = req.joinToString(" ") { b -> "%02X".format(b) },
-                            response = resp.joinToString(" ") { b -> "%02X".format(b) },
-                            error = null
-                        )
-                    }
-                }.onFailure { throwable ->
-                    updateState { it.copy(error = "Ошибка: ${throwable.message}") }
-                    NotificationManager.show("Ошибка: ${throwable.message}")
-                }
-            } catch (e: Exception) {
-                updateState { it.copy(error = "Ошибка: ${e.message}") }
-                NotificationManager.show("Ошибка: ${e.message}")
-            } finally {
-                isRequestInProgress = false
-            }
-        }
-    }
-
-    fun sendRawRequest() {
-        scope.launch {
-            try {
-                val config = current.connectionState.toPortConfig()
-                val raw = current.rawRequest
-
-                val result = sendRawRequestUseCase(raw, config)
-
-                result.onSuccess { (req, resp) ->
-                    updateState {
-                        it.copy(
-                            lastRequestHex = req.joinToString(" ") { b -> "%02X".format(b) },
-                            response = resp.joinToString(" ") { b -> "%02X".format(b) },
-                            error = null
-                        )
-                    }
-                    NotificationManager.show("Запрос успешно отправлен")
-                }.onFailure { throwable ->
-                    updateState { it.copy(error = "Ошибка: ${throwable.message}") }
-                    NotificationManager.show("Ошибка: ${throwable.message}")
-                }
-            } catch (e: Exception) {
-                updateState { it.copy(error = "Ошибка: ${e.message}") }
-                NotificationManager.show("Ошибка: ${e.message}")
-            } finally {
-                isRequestInProgress = false
-            }
-        }
-    }
-
     fun getFormattedResponse(): String {
-        return formatResponseUseCase.execute(
-            response = current.response,
-            displayMode = current.displayMode,
-            byteOrder = current.byteOrder
-        )
+        val float = state.value.response.toFloatOrNull() ?: return "Ошибка"
+        return when (state.value.displayMode) {
+            DisplayMode.DEC -> "Значение: ${float}"
+            DisplayMode.HEX -> "0x%08X".format(java.lang.Float.floatToIntBits(float))
+            DisplayMode.FLOAT -> "Плавающая: $float"
+        }
     }
-} 
+
+}

@@ -14,7 +14,7 @@ data class ConnectionState(
     val attemptCount: String          = "3",
     val timeoutRead: String           = "200",
     val timeoutWrite: String          = "200",
-    val pollIntervalMillis: Long      = 1000L,    // <— у вас уже есть
+    val pollIntervalMillis: Long      = 1000L,
     val isConnected: Boolean = false,
     val showAllPorts: Boolean = false,
     val testResponse: String? = null,

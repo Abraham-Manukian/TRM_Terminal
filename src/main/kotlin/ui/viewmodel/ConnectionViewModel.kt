@@ -1,6 +1,7 @@
 package ui.viewmodel
 
 import cafe.adriel.voyager.core.model.ScreenModel
+import domain.model.PortConfig
 import domain.usecase.LoadPortsUseCase
 import domain.usecase.SaveConnectionSettingsUseCase
 import domain.usecase.StartPollingUseCase
@@ -31,20 +32,26 @@ class ConnectionViewModel(
         _state.update { it.f() }
     }
 
-    /** Загружает список COM-портов заново */
     fun loadPorts() {
         scope.launch {
             runCatching {
                 loadPortsUseCase.execute(state.value.showAllPorts)
             }.onSuccess { list ->
-                update { copy(ports = list.associateBy { it.systemName }) }
+                val portsMap = list.associateBy { it.systemName }
+                val firstPort = portsMap.keys.firstOrNull().orEmpty()
+
+                update {
+                    copy(
+                        ports = portsMap,
+                        selectedPort = if (selectedPort.isBlank()) firstPort else selectedPort
+                    )
+                }
             }.onFailure {
                 update { copy(error = "Не удалось загрузить порты: ${it.message}") }
             }
         }
     }
 
-    /** Переключает флаг, показывать ли все порты, и перезагружает их */
     fun toggleShowAllPorts() {
         update { copy(showAllPorts = !showAllPorts) }
         loadPorts()
@@ -90,6 +97,8 @@ class ConnectionViewModel(
         stopPollingUseCase.invoke()
         update { copy(isConnected = false) }
     }
+
+
 
     // Сеттеры для UI-поля
     fun selectPort(key: String)       = update { copy(selectedPort   = key) }

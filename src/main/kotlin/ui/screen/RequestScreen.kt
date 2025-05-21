@@ -257,7 +257,7 @@ class RequestScreen() : Screen {
                     )
 
                     OutlinedButton(
-                        onClick = { viewModel.sendRawRequest() },
+                        onClick = { print("Don`t working") },//viewModel.sendRawRequest()
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.outlinedButtonColors(

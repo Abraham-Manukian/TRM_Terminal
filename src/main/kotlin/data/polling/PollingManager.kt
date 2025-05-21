@@ -1,6 +1,5 @@
 package data.polling
 
-import org.example.data.DevicePoller.checkResponsibilityAndNotify
 import org.example.data.DevicePoller.connection
 import org.example.data.DevicePoller.devs
 import domain.model.PortConfig
@@ -14,18 +13,20 @@ import ru.avem.kserialpooler.utils.SerialParameters
 import ru.avem.library.polling.DeviceRegister
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Менеджер фонового опроса и одиночных полей.
- */
+
 class PollingManager(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : PollingService {
     private var job: Job? = null
     private lateinit var controller: Avem4Controller
-    private lateinit var currentConfig: PortConfig
+    private var currentConfig: PortConfig? = null
     private val fieldJobs = ConcurrentHashMap<Int, Job>()
+    private var isPollingRunning = false
 
     override fun startPolling(config: PortConfig) {
+        if (isPollingRunning) return
+
+        isPollingRunning = true
         stopAll()
         currentConfig = config
 
@@ -50,8 +51,6 @@ class PollingManager(
 
         controller.addTo(devs)
         with(controller) {
-            // пример использований из utility:
-            // DevicePoller.startPoll(controller.name, model.FREQUENCY_TM) { println(it) }
         }
         job = CoroutineScope(ioDispatcher).launch {
             while (isActive) {
@@ -76,7 +75,8 @@ class PollingManager(
         onValue: (Double) -> Unit
     ) {
         if (!::controller.isInitialized) {
-            startPolling(currentConfig)
+            val config = currentConfig ?: error("PortConfig is not set")
+            startPolling(config)
         }
         fieldJobs[registerAddress]?.cancel()
         val job = CoroutineScope(ioDispatcher).launch {
@@ -86,7 +86,7 @@ class PollingManager(
                     .first { it.address.toInt() == registerAddress }
                 controller.readRegister(reg)
                 onValue(reg.value.toDouble())
-                delay(currentConfig.pollIntervalMillis)
+                delay(currentConfig!!.pollIntervalMillis)
             }
         }
         fieldJobs[registerAddress] = job
@@ -97,6 +97,10 @@ class PollingManager(
             .values
             .first { it.address.toInt() == registerAddress }
         controller.writeRegister(reg, value)
+    }
+
+    fun updateConfig(config: PortConfig) {
+        currentConfig = config
     }
 
     override fun getRegisters(): List<domain.model.Register> {
@@ -117,6 +121,17 @@ class PollingManager(
             // readOnly оставляем по умолчанию = true
             )
         }
+    }
+
+    suspend fun readRegisterOnce(registerAddress: Int): Float {
+        val config = currentConfig ?: error("PortConfig is not set")
+        startPolling(config)
+        val reg = controller.model.registers
+            .values
+            .first { it.address.toInt() == registerAddress }
+
+        controller.readRegister(reg)
+        return reg.value.toFloat()
     }
 }
 

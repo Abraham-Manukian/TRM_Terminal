@@ -15,6 +15,7 @@ repositories {
         dirs("libs")
     }
 }
+
 val voyager_vresion = "1.0.1"
 
 dependencies {
