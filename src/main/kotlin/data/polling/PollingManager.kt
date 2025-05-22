@@ -70,6 +70,11 @@ class PollingManager(
         } catch (_: Exception) {}
     }
 
+    override fun stopFieldPolling(registerAddress: Int) {
+        fieldJobs[registerAddress]?.cancel()
+        fieldJobs.remove(registerAddress)
+    }
+
     override fun startFieldPolling(
         registerAddress: Int,
         onValue: (Double) -> Unit

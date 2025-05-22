@@ -5,6 +5,7 @@ import domain.model.PortConfig
 interface PollingService {
     fun startPolling(config: PortConfig)
     fun stopAll()
+    fun stopFieldPolling(registerAddress: Int)
     fun startFieldPolling(
         registerAddress: Int,
         onValue: (Double) -> Unit
